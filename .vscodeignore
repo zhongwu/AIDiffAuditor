@@ -1,0 +1,10 @@
+.vscode/**
+src/**
+test/**
+out/test/**
+**/*.map
+tsconfig.json
+.gitignore
+BRAINSTORM.md
+CLAUDE.md
+SESSION-NOTES.md

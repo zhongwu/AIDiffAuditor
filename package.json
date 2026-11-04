@@ -1,0 +1,134 @@
+{
+  "name": "agent-diff-auditor",
+  "displayName": "Agent Diff Auditor",
+  "description": "Catches the shortcuts AI coding agents take to look done: skipped or deleted tests, weakened assertions, suppressed errors and softened CI.",
+  "version": "0.0.1",
+  "publisher": "your-publisher-id",
+  "private": true,
+  "engines": {
+    "vscode": "^1.100.0",
+    "node": ">=22"
+  },
+  "categories": [
+    "Testing",
+    "Linters",
+    "AI"
+  ],
+  "keywords": [
+    "ai",
+    "agent",
+    "code review",
+    "tests",
+    "git diff"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/src/extension.js",
+  "bin": {
+    "diffaudit": "./out/src/cli.js"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "diffAuditor.audit",
+        "title": "Diff Auditor: Audit Changes",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "diffAuditor.clear",
+        "title": "Diff Auditor: Clear Findings"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "diffAuditor.findings",
+          "name": "Diff Auditor",
+          "contextualTitle": "Diff Auditor"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "diffAuditor.audit",
+          "when": "view == diffAuditor.findings",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Diff Auditor",
+      "properties": {
+        "diffAuditor.baseRef": {
+          "type": "string",
+          "default": "HEAD",
+          "description": "Git ref to compare the working tree against. Use e.g. 'main' to audit everything on a branch."
+        },
+        "diffAuditor.includeUntracked": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also audit new files that git does not track yet (agents often add new test files)."
+        },
+        "diffAuditor.minSeverity": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "default": "low",
+          "description": "Hide findings below this severity."
+        },
+        "diffAuditor.ignoreRules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Rule ids to turn off, for example 'suppression-added'."
+        },
+        "diffAuditor.autoAudit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Re-run the audit shortly after every file save."
+        }
+      }
+    },
+    "languageModelTools": [
+      {
+        "name": "diffAuditor_auditChanges",
+        "tags": [
+          "code-review",
+          "testing"
+        ],
+        "toolReferenceName": "auditChanges",
+        "displayName": "Audit Working-Tree Changes",
+        "canBeReferencedInPrompt": true,
+        "userDescription": "Scan uncommitted changes for shortcuts such as skipped tests, weakened assertions and suppressed errors.",
+        "modelDescription": "Scans the git diff of the current workspace for shortcuts that make a task look finished without actually being finished: deleted or skipped tests, removed or weakened assertions, newly added @ts-ignore / eslint-disable / noqa suppressions, empty catch blocks and CI checks that were softened. Call it before telling the user a task is done, and fix or explicitly justify every finding it reports.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "baseRef": {
+              "type": "string",
+              "description": "Optional git ref to diff against. Defaults to the configured base ref (HEAD)."
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.100.0",
+    "typescript": "^5.6.0"
+  }
+}
