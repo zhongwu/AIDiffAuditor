@@ -5,6 +5,9 @@ out/test/**
 **/*.map
 tsconfig.json
 .gitignore
+.gitattributes
+.github/**
 BRAINSTORM.md
 CLAUDE.md
 SESSION-NOTES.md
+DEVELOPMENT-PLAN.md

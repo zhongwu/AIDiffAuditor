@@ -4,6 +4,7 @@
   "description": "Catches the shortcuts AI coding agents take to look done: skipped or deleted tests, weakened assertions, suppressed errors and softened CI.",
   "version": "0.0.1",
   "publisher": "your-publisher-id",
+  "license": "MIT",
   "private": true,
   "engines": {
     "vscode": "^1.100.0",
