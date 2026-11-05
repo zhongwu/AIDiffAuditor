@@ -37,7 +37,9 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
       (lines cancelled across files in one diff), scoped suppressions (`# type: ignore[code]`, `# noqa: E501`, `@SuppressWarnings("x")`) are low,
       assertions removed with their whole test no longer double-reported, deleted helper files with no tests are low.
 - [ ] Still to measure: diffs from real agent sessions rather than human history, and Ruby, C#, PHP, Kotlin, Swift repos.
-- [ ] Remaining known noise: `t.Skip` guarded by an `if` (Go short mode), tests deleted because a feature or module moved to another repository.
+- [ ] Remaining known noise: `t.Skip` guarded by an `if` (Go short mode), tests deleted because a feature or module moved to another repository. Also click merging several asserts into one parametrized test reads as a weakening.
+- [x] Python assertion weakening: `assert a == b` reduced to `assert a` or `assert a is not None` is `assertion-weakened`, only when the hunk loses more precise asserts than it gains (reformatting and wrapped `assert (` are not flagged). First version gave 19 false alarms on requests and click; tightened to 1 across all six repos (click merging six asserts into one parametrized test). 72 tests passing.
+- [ ] Capture real agent diffs as fixtures: run Claude Code and Copilot on "make the failing test pass" in `.sandbox`, save with `git diff > test/fixtures/<name>.patch`, add the expectation to `expected.json`.
 - [ ] Known false alarm: regex/pattern tables in linting tools (this repo's own `rules.ts`) look like suppressions.
 - [ ] Keep every rule at one positive and one negative test minimum; no rule id renames.
 - [x] New rules: `coverage-lowered`, `timeout-inflated`, `retries-added` (before/after comparison of numbers, restricted to test files, test configs and CI). 0 false alarms on 203 real commits; caught 1 real timeout bump (20s to 60s).
