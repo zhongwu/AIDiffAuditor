@@ -17,7 +17,7 @@ Cursor, Codex...) and needs no API key. Every rule is plain pattern matching, so
 | `test-removed` | medium | More test cases removed than added |
 | `test-focused` | medium | `.only` / `fit` hides the rest of the suite |
 | `suppression-added` | medium / high | `@ts-ignore`, `eslint-disable`, `# type: ignore`, `# noqa`, `#[allow]`, coverage ignores. File-wide ones (`@ts-nocheck`, bare `eslint-disable`) are high |
-| `empty-catch` | medium | `catch {}`, `.catch(() => {})`, `except: pass` |
+| `empty-catch` | medium | `catch {}`, `except: pass`. Low when it looks deliberate (a named exception type, a comment, `.catch(() => {})`); skipped for cleanup calls like `File.Delete` |
 | `ci-weakened` | medium / high | `continue-on-error: true`, `\|\| true`, `--exit-zero`, a `test` script replaced by `echo` |
 | `ci-test-removed` | medium | A test command removed from a CI pipeline |
 

@@ -51,6 +51,25 @@ const EMPTY_CATCH_ONE_LINE: RegExp[] = [
 const CATCH_OPEN_RE = /\bcatch\s*(?:\([^)]*\))?\s*\{\s*$/;
 const EXCEPT_OPEN_RE = /^\s*except\b[^:]*:\s*$/;
 
+/** try { File.Delete(x); } catch { }: best-effort cleanup is a normal reason to ignore an error. */
+const CLEANUP_RE = /\b(?:delete|remove|unlink|rmdir|rmSync|dispose|close|cleanup|kill|release|disconnect)\w*\s*\(/i;
+/** catch (TimeoutException) { }: naming one specific exception shows the author meant to ignore just that. */
+const TYPED_CATCH_RE =
+  /\bcatch\s*\(\s*(?!(?:final\s+)?(?:Exception|Throwable|Error|BaseException|SystemException|e|err|error|ex)\b)[A-Z]\w*(?:\.\w+)*(?:\s+\w+)?\s*\)/;
+/** Something written between the braces, which usually explains why. */
+const CATCH_COMMENT_RE = /\{\s*(?:\/\/\s*\S|\/\*\s*\S)/;
+
+/** How loudly to report an empty catch: skip routine cleanup, soften deliberate-looking ones. */
+function emptyCatchSeverity(text: string): Severity | null {
+  if (/\btry\s*\{/.test(text) && CLEANUP_RE.test(text)) {
+    return null;
+  }
+  if (/\.catch\(/.test(text) || TYPED_CATCH_RE.test(text) || CATCH_COMMENT_RE.test(text)) {
+    return 'low';
+  }
+  return 'medium';
+}
+
 const CI_YAML_RE =
   /(?:^|\/)(?:\.github\/workflows\/[^/]+\.ya?ml|\.gitlab-ci\.ya?ml|azure-pipelines[^/]*\.ya?ml|\.circleci\/[^/]+|\.travis\.ya?ml|bitbucket-pipelines\.ya?ml|Jenkinsfile)$/;
 const BUILD_FILE_RE = /(?:^|\/)(?:Makefile|justfile|tox\.ini|package\.json)$/;
@@ -89,6 +108,36 @@ const removed = (file: FileDiff): DiffLine[] => allLines(file).filter((l) => l.t
 
 const isAssertion = (l: DiffLine): boolean => !isCommentLine(l.text) && ASSERT_RE.test(l.text);
 
+/**
+ * True when `index` falls inside a quoted string on this line, so code that merely mentions
+ * `it.skip` or `@ts-ignore` in a string (a test that builds a fake diff, say) is not reported.
+ * Scanning stops at a line comment, which is where suppressions legitimately live.
+ */
+function insideString(text: string, index: number): boolean {
+  let quote = '';
+  for (let i = 0; i < index; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === '\\') {
+        i++;
+      } else if (c === quote) {
+        quote = '';
+      }
+    } else if (c === '"' || c === "'" || c === '`') {
+      quote = c;
+    } else if ((c === '/' && text[i + 1] === '/') || c === '#') {
+      return false;
+    }
+  }
+  return quote !== '';
+}
+
+/** Like re.test(text), but ignores a match that sits inside a string literal. */
+function hits(re: RegExp, text: string): boolean {
+  const m = re.exec(text);
+  return m !== null && !insideString(text, m.index);
+}
+
 // ---------------------------------------------------------------------------
 // Rules
 // ---------------------------------------------------------------------------
@@ -108,8 +157,11 @@ const testSkipped: Rule = {
   id: 'test-skipped',
   description: 'A test was switched off with skip / xit / @Disabled / t.Skip and similar.',
   run(file) {
+    if (!isCodeFile(file.path)) {
+      return [];
+    }
     return added(file)
-      .filter((l) => !isCommentLine(l.text) && SKIP_RE.test(l.text))
+      .filter((l) => !isCommentLine(l.text) && hits(SKIP_RE, l.text))
       .map((l) => at(this.id, 'high', file, l, 'Test skipped or disabled'));
   },
 };
@@ -175,10 +227,14 @@ const assertionWeakened: Rule = {
       if (!hunk.lines.some((l) => l.type === 'del' && isAssertion(l))) {
         continue;
       }
-      for (const l of hunk.lines) {
-        if (l.type === 'add' && !isCommentLine(l.text) && WEAK_MATCHER_RE.test(l.text)) {
-          out.push(at(this.id, 'medium', file, l, 'Assertion may be weaker than the one it replaced'));
-        }
+      // One finding per hunk: a rewrite that weakens ten lines is one problem, not ten.
+      const weak = hunk.lines.filter((l) => l.type === 'add' && !isCommentLine(l.text) && WEAK_MATCHER_RE.test(l.text));
+      if (weak.length > 0) {
+        const message =
+          weak.length > 1
+            ? `${weak.length} assertions may be weaker than the ones they replaced`
+            : 'Assertion may be weaker than the one it replaced';
+        out.push(at(this.id, 'medium', file, weak[0], message));
       }
     }
     return out;
@@ -193,7 +249,7 @@ const tautologyAssertion: Rule = {
       return [];
     }
     return added(file)
-      .filter((l) => !isCommentLine(l.text) && TAUTOLOGY_RE.test(l.text))
+      .filter((l) => !isCommentLine(l.text) && hits(TAUTOLOGY_RE, l.text))
       .map((l) => at(this.id, 'high', file, l, 'Assertion can never fail'));
   },
 };
@@ -207,7 +263,7 @@ const suppressionAdded: Rule = {
     }
     const out: Finding[] = [];
     for (const l of added(file)) {
-      const hit = SUPPRESSIONS.find((s) => s.re.test(l.text));
+      const hit = SUPPRESSIONS.find((s) => hits(s.re, l.text));
       if (hit) {
         out.push(at(this.id, hit.severity, file, l, `Suppression added: ${hit.label}`));
       }
@@ -233,7 +289,10 @@ const emptyCatch: Rule = {
           continue;
         }
         if (EMPTY_CATCH_ONE_LINE.some((re) => re.test(l.text))) {
-          out.push(at(this.id, 'medium', file, l, message));
+          const severity = emptyCatchSeverity(l.text);
+          if (severity) {
+            out.push(at(this.id, severity, file, l, message));
+          }
           continue;
         }
         const next = lines[i + 1];
@@ -242,7 +301,7 @@ const emptyCatch: Rule = {
         }
         if ((CATCH_OPEN_RE.test(l.text) && /^\s*\}/.test(next.text)) ||
             (EXCEPT_OPEN_RE.test(l.text) && /^\s*pass\s*(?:#.*)?$/.test(next.text))) {
-          out.push(at(this.id, 'medium', file, l, message));
+          out.push(at(this.id, TYPED_CATCH_RE.test(l.text) ? 'low' : 'medium', file, l, message));
         }
       }
     }

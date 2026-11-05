@@ -148,3 +148,55 @@ test('skips lockfiles, snapshots and build output', () => {
   assert.deepEqual(ids(mod('dist/app.js', ['+// @ts-ignore'])), []);
   assert.deepEqual(ids(mod('src/__snapshots__/a.test.ts.snap', ['+it.skip'])), []);
 });
+
+// --- false-alarm fixes found by auditing real repository history -------------
+
+const sevs = (diff: string): string[] => auditDiff(diff).map((f) => `${f.ruleId}:${f.severity}`);
+
+test('docs that mention it.skip are not reported as a skipped test', () => {
+  assert.deepEqual(ids(mod('README.md', ['+Use `it.skip` only with a ticket number.'])), []);
+  assert.deepEqual(ids(mod('docs/PLAN.md', ['+| `test-skipped` | high | `it.skip`, `xit`, `t.Skip` |'])), []);
+  assert.deepEqual(ids(mod('src/a.test.ts', ["+  it.skip('x', () => {});"])), ['test-skipped']);
+});
+
+test('a pattern inside a string literal is not a real skip, suppression or tautology', () => {
+  assert.deepEqual(ids(mod('src/a.test.ts', ['+  const src = "it.skip(\'works\', () => {})";'])), []);
+  assert.deepEqual(ids(mod('src/a.ts', ["+  const s = '// @ts-ignore';"])), []);
+  assert.deepEqual(ids(mod('src/a.test.ts', ['+  const t = "expect(true).toBe(true)";'])), []);
+  // The same text as real code, and a trailing comment after a string, are still caught.
+  assert.deepEqual(ids(mod('src/a.ts', ['+  const s = "it\'s fine"; // @ts-ignore'])), ['suppression-added']);
+  assert.deepEqual(ids(mod('src/a.ts', ['+  foo(); // eslint-disable-line no-console'])), ['suppression-added']);
+});
+
+test('many weakened assertions in one hunk are reported once', () => {
+  const diff = mod(
+    'src/a.test.ts',
+    [
+      '-    expect(pts).toHaveLength(2);',
+      '-    expect(pts[0].timestamp).toBe(1000);',
+      '+    expect(pts.length).toBeGreaterThan(0);',
+      '+    expect(pts[0].timestamp).toBeGreaterThan(0);',
+      '+    expect(pts[0].open).toBeDefined();',
+    ],
+    '10,2 +10,3',
+  );
+  const found = auditDiff(diff).filter((f) => f.ruleId === 'assertion-weakened');
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /3 assertions/);
+});
+
+test('best-effort cleanup in a try/catch is not reported', () => {
+  assert.deepEqual(ids(mod('src/A.cs', ['+  try { Directory.Delete(_dir, true); } catch { }'])), []);
+  assert.deepEqual(ids(mod('src/a.ts', ['+  try { fs.unlinkSync(p); } catch {}'])), []);
+  assert.deepEqual(ids(mod('src/a.ts', ['+  try { run(); } catch {}'])), ['empty-catch']);
+});
+
+test('deliberate-looking empty catches are low severity, bare ones stay medium', () => {
+  assert.deepEqual(sevs(mod('src/T.cs', ['+  catch (TimeoutException) { }'])), ['empty-catch:low']);
+  assert.deepEqual(sevs(mod('src/S.cs', ['+  catch { /* work() never throws */ }'])), ['empty-catch:low']);
+  assert.deepEqual(sevs(mod('src/a.ts', ['+  load().catch(() => {});'])), ['empty-catch:low']);
+  assert.deepEqual(sevs(mod('src/a.ts', ['+  try { run(); } catch (e) {}'])), ['empty-catch:medium']);
+  assert.deepEqual(sevs(mod('src/A.cs', ['+  catch { }'])), ['empty-catch:medium']);
+  assert.deepEqual(sevs(mod('src/A.cs', ['+  catch (Exception) { }'])), ['empty-catch:medium']);
+  assert.deepEqual(sevs(mod('src/a.py', ['+except:', '+    pass'])), ['empty-catch:medium']);
+});

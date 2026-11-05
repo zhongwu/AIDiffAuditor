@@ -28,8 +28,12 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [ ] Fix what breaks; add tests for anything fixable in `src/core`.
 
 ## Phase 2: Rule quality
-- [ ] Build a fixture corpus of real agent diffs (true positives) and ordinary refactors (negatives).
-- [ ] Measure false-positive rate on a few real repos; tighten rules per the "prefer missing to false alarms" convention.
+- [ ] Build a fixture corpus of real agent diffs (true positives) and ordinary refactors (negatives). Needs real agent output; human commit history only gives negatives.
+- [x] First false-positive pass: `node scripts/audit-history.js <repo>...` audits every past commit of real repos (read-only).
+      On 5 repos / 203 commits: 37 findings -> 27, and only 9 at medium or above (18 are low). Fixed: docs mentioning `it.skip`
+      flagged HIGH, patterns inside string literals, one finding per weakened hunk, empty-catch noise (cleanup skipped, typed/commented/promise catches low).
+- [ ] Still to measure: a larger or different mix of repos (Python, Go, Java), and diffs from real agent sessions rather than human history.
+- [ ] Known false alarm: regex/pattern tables in linting tools (this repo's own `rules.ts`) look like suppressions.
 - [ ] Keep every rule at one positive and one negative test minimum; no rule id renames.
 - [ ] Add rules: coverage-threshold lowered, timeout inflation, retries added to flaky tests.
 - [ ] Widen language coverage: Python (pytest/unittest), Go, Java/Kotlin (JUnit), Rust, C#, Ruby.
