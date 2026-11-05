@@ -32,7 +32,12 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [x] First false-positive pass: `node scripts/audit-history.js <repo>...` audits every past commit of real repos (read-only).
       On 5 repos / 203 commits: 37 findings -> 27, and only 9 at medium or above (18 are low). Fixed: docs mentioning `it.skip`
       flagged HIGH, patterns inside string literals, one finding per weakened hunk, empty-catch noise (cleanup skipped, typed/commented/promise catches low).
-- [ ] Still to measure: a larger or different mix of repos (Python, Go, Java), and diffs from real agent sessions rather than human history.
+- [x] Second pass on open-source Python/Go/Java/Rust history (requests, click, cobra, gin, gson, ripgrep; 300 commits each, 1,800 total):
+      high+medium findings 392 -> 44. Fixes: `@pytest.mark.skipif` was reported as a HIGH skip (30 of click's 32), moved or split tests counted as removed
+      (lines cancelled across files in one diff), scoped suppressions (`# type: ignore[code]`, `# noqa: E501`, `@SuppressWarnings("x")`) are low,
+      assertions removed with their whole test no longer double-reported, deleted helper files with no tests are low.
+- [ ] Still to measure: diffs from real agent sessions rather than human history, and Ruby, C#, PHP, Kotlin, Swift repos.
+- [ ] Remaining known noise: `t.Skip` guarded by an `if` (Go short mode), tests deleted because a feature or module moved to another repository.
 - [ ] Known false alarm: regex/pattern tables in linting tools (this repo's own `rules.ts`) look like suppressions.
 - [ ] Keep every rule at one positive and one negative test minimum; no rule id renames.
 - [x] New rules: `coverage-lowered`, `timeout-inflated`, `retries-added` (before/after comparison of numbers, restricted to test files, test configs and CI). 0 false alarms on 203 real commits; caught 1 real timeout bump (20s to 60s).

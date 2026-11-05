@@ -16,7 +16,14 @@ const TEST_DECL_RE =
 
 /** A test that is switched off. */
 const SKIP_RE =
-  /\b(?:it|test|describe|context|suite)\.skip\b|\bx(?:it|describe|test|context)\b\s*[('"`]|@pytest\.mark\.(?:skip|xfail)|@unittest\.(?:skip|expectedFailure)|\bpytest\.skip\(|\bself\.skipTest\(|\bt\.Skip(?:f|Now)?\(|@Disabled\b|@Ignore\b|#\[ignore\b|\bmarkTest(?:Skipped|Incomplete)\(/;
+  /\b(?:it|test|describe|context|suite)\.skip\b|\bx(?:it|describe|test|context)\b\s*[('"`]|@pytest\.mark\.(?:skip|xfail)\b|@unittest\.(?:skip|expectedFailure)\b|\bpytest\.skip\(|\bself\.skipTest\(|\bt\.Skip(?:f|Now)?\(|@Disabled\b|@Ignore\b|#\[ignore\b|\bmarkTest(?:Skipped|Incomplete)\(/;
+
+/**
+ * Skips that only apply under a condition (a platform, a missing tool). They are a normal way to
+ * write portable tests, so they are reported at low severity, unless the condition is a literal True.
+ */
+const CONDITIONAL_SKIP_RE = /@pytest\.mark\.skipif\b|@unittest\.skip(?:If|Unless)\b/;
+const ALWAYS_TRUE_SKIPIF_RE = /@pytest\.mark\.skipif\s*\(\s*(?:True|1)\s*[,)]|@unittest\.skipIf\s*\(\s*(?:True|1)\s*[,)]/;
 
 /** `.only` / `fit` run a single test and silently drop the rest of the suite. */
 const FOCUS_RE = /\b(?:it|test|describe|context)\.only\s*\(|\bf(?:it|describe|context)\s*\(/;
@@ -29,19 +36,26 @@ const TAUTOLOGY_RE =
 const WEAK_MATCHER_RE =
   /\.(?:toBeTruthy|toBeFalsy|toBeDefined|toBeUndefined|toBeNull)\s*\(\s*\)|\bexpect\.(?:anything|any)\s*\(|\.not\.toThrow\s*\(\s*\)|\.toBeGreaterThan\s*\(\s*0\s*\)|\bassert(?:True|NotNone|IsNotNone|NotNull)\s*\(/;
 
-const SUPPRESSIONS: { re: RegExp; label: string; severity: Severity }[] = [
+/**
+ * Suppression comments. A `scoped` match names one specific error or lint rule, which is a
+ * deliberate and targeted choice, so it is reported at low severity. Blanket ones keep `severity`.
+ */
+const SUPPRESSIONS: { re: RegExp; label: string; severity: Severity; scoped?: RegExp }[] = [
   { re: /@ts-nocheck\b/, label: '@ts-nocheck turns off type checking for the whole file', severity: 'high' },
-  { re: /@ts-(?:ignore|expect-error)\b/, label: 'type error suppressed with @ts-ignore / @ts-expect-error', severity: 'medium' },
+  { re: /@ts-ignore\b/, label: 'type error suppressed with @ts-ignore', severity: 'medium' },
+  { re: /@ts-expect-error\b/, label: 'type error suppressed with @ts-expect-error', severity: 'low' },
   { re: /eslint-disable(?!-)/, label: 'eslint-disable without a line scope turns rules off for a whole block or file', severity: 'high' },
-  { re: /eslint-disable-(?:next-)?line\b/, label: 'lint error suppressed with eslint-disable', severity: 'medium' },
+  { re: /eslint-disable-(?:next-)?line\b/, label: 'lint error suppressed with eslint-disable', severity: 'medium', scoped: /eslint-disable-(?:next-)?line\s+[@\w/-]/ },
   { re: /#\s*mypy:\s*ignore-errors/, label: '# mypy: ignore-errors turns off type checking for the whole file', severity: 'high' },
-  { re: /#\s*type:\s*ignore\b|#\s*pyright:\s*ignore\b/, label: 'type error suppressed with a type-ignore comment', severity: 'medium' },
-  { re: /#\s*noqa\b|#\s*pylint:\s*disable|#\s*rubocop:disable/i, label: 'lint error suppressed', severity: 'medium' },
-  { re: /\/\/\s*(?:nolint|NOLINT)\b|\/\/\s*biome-ignore\b|NOSONAR/, label: 'lint error suppressed', severity: 'medium' },
-  { re: /#!?\[allow\(/, label: 'Rust warning silenced with #[allow(...)]', severity: 'medium' },
-  { re: /@SuppressWarnings\b|#pragma\s+warning\s+disable|@phpstan-ignore|@psalm-suppress/, label: 'compiler or analyzer warning suppressed', severity: 'medium' },
+  { re: /#\s*type:\s*ignore\b|#\s*pyright:\s*ignore\b/, label: 'type error suppressed with a type-ignore comment', severity: 'medium', scoped: /ignore\[/ },
+  { re: /#\s*noqa\b|#\s*pylint:\s*disable|#\s*rubocop:disable/i, label: 'lint error suppressed', severity: 'medium', scoped: /noqa\s*:\s*[A-Z]+\d|pylint:\s*disable\s*=\s*\w|rubocop:disable\s+[A-Z]\w+/i },
+  { re: /\/\/\s*(?:nolint|NOLINT)\b|\/\/\s*biome-ignore\b|NOSONAR/, label: 'lint error suppressed', severity: 'medium', scoped: /nolint\s*:\s*\w|biome-ignore\s+lint\/\w/i },
+  { re: /#!\[allow\(/, label: 'Rust warning silenced for the whole crate or module with #![allow(...)]', severity: 'medium' },
+  { re: /#\[allow\(/, label: 'Rust warning silenced with #[allow(...)]', severity: 'low' },
+  { re: /@SuppressWarnings\b|#pragma\s+warning\s+disable|@phpstan-ignore|@psalm-suppress/, label: 'compiler or analyzer warning suppressed', severity: 'medium', scoped: /@SuppressWarnings\s*\(\s*[{"]/ },
   { re: /(?:istanbul|c8|v8)\s+ignore\b|#\s*pragma:\s*no cover/, label: 'code excluded from coverage', severity: 'medium' },
 ];
+
 
 const EMPTY_CATCH_ONE_LINE: RegExp[] = [
   /\bcatch\s*(?:\([^)]*\))?\s*\{\s*(?:\/\/[^\n]*|\/\*.*?\*\/)?\s*\}/,
@@ -149,7 +163,22 @@ const testFileDeleted: Rule = {
     if (file.status !== 'deleted' || !isTestFile(file.path)) {
       return [];
     }
-    return [{ ruleId: this.id, severity: 'high', file: file.path, line: 1, message: 'Test file deleted' }];
+    // The content was moved or split into other files in the same diff: nothing was lost.
+    const moved = file.movedAway ?? 0;
+    if (moved > 0 && moved >= removed(file).length) {
+      return [];
+    }
+    // A deleted file with no test cases in it (shared helpers, fixtures) is much less alarming.
+    const hasTests = allLines(file).some((l) => TEST_DECL_RE.test(l.text));
+    return [
+      {
+        ruleId: this.id,
+        severity: hasTests ? 'high' : 'low',
+        file: file.path,
+        line: 1,
+        message: hasTests ? 'Test file deleted' : 'Test helper file deleted',
+      },
+    ];
   },
 };
 
@@ -160,9 +189,18 @@ const testSkipped: Rule = {
     if (!isCodeFile(file.path)) {
       return [];
     }
-    return added(file)
-      .filter((l) => !isCommentLine(l.text) && hits(SKIP_RE, l.text))
-      .map((l) => at(this.id, 'high', file, l, 'Test skipped or disabled'));
+    const out: Finding[] = [];
+    for (const l of added(file)) {
+      if (isCommentLine(l.text)) {
+        continue;
+      }
+      if (hits(SKIP_RE, l.text) || hits(ALWAYS_TRUE_SKIPIF_RE, l.text)) {
+        out.push(at(this.id, 'high', file, l, 'Test skipped or disabled'));
+      } else if (hits(CONDITIONAL_SKIP_RE, l.text)) {
+        out.push(at(this.id, 'low', file, l, 'Test skipped under a condition'));
+      }
+    }
+    return out;
   },
 };
 
@@ -204,7 +242,11 @@ const assertionRemoved: Rule = {
     if (!isTestFile(file.path) || file.status === 'deleted') {
       return [];
     }
-    const gone = removed(file).filter(isAssertion);
+    // Assertions that disappeared together with their whole test are already reported by
+    // test-removed; this rule is about assertions taken out of tests that stay.
+    const gone = file.hunks
+      .filter((h) => !h.lines.some((l) => l.type === 'del' && TEST_DECL_RE.test(l.text)))
+      .flatMap((h) => h.lines.filter((l) => l.type === 'del' && isAssertion(l)));
     const fresh = added(file).filter(isAssertion);
     if (gone.length <= fresh.length) {
       return [];
@@ -265,7 +307,8 @@ const suppressionAdded: Rule = {
     for (const l of added(file)) {
       const hit = SUPPRESSIONS.find((s) => hits(s.re, l.text));
       if (hit) {
-        out.push(at(this.id, hit.severity, file, l, `Suppression added: ${hit.label}`));
+        const severity = hit.scoped && hit.scoped.test(l.text) ? 'low' : hit.severity;
+        out.push(at(this.id, severity, file, l, `Suppression added: ${hit.label}`));
       }
     }
     return out;

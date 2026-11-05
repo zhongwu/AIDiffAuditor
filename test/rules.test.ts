@@ -86,7 +86,8 @@ test('flags suppression comments with the right severity', () => {
   assert.deepEqual(sev('src/a.ts', '+// @ts-ignore'), ['medium']);
   assert.deepEqual(sev('src/a.ts', '+// @ts-nocheck'), ['high']);
   assert.deepEqual(sev('src/a.ts', '+/* eslint-disable */'), ['high']);
-  assert.deepEqual(sev('src/a.ts', '+foo(); // eslint-disable-line no-console'), ['medium']);
+  assert.deepEqual(sev('src/a.ts', '+foo(); // eslint-disable-line'), ['medium']);
+  assert.deepEqual(sev('src/a.ts', '+foo(); // eslint-disable-line no-console'), ['low']);
   assert.deepEqual(sev('src/a.py', '+x = y  # type: ignore'), ['medium']);
   assert.deepEqual(sev('src/a.py', '+import os  # noqa'), ['medium']);
 });
@@ -258,4 +259,61 @@ test('catches a mocha timeout raised in a VS Code extension test config (seen in
     'timeout-inflated',
   );
   assert.deepEqual(found.map((f) => [f.severity, f.message]), [['low', 'Timeout raised from 20000 to 60000']]);
+});
+
+// --- false alarms found by auditing real open-source repositories --------------
+
+const sevOf = (diff: string): string[] => auditDiff(diff).map((f) => `${f.ruleId}:${f.severity}`);
+
+test('conditional skips are low severity, unconditional ones stay high', () => {
+  assert.deepEqual(sevOf(mod('tests/test_a.py', ['+@pytest.mark.skipif(WIN, reason="No sed on Windows.")'])), ['test-skipped:low']);
+  assert.deepEqual(sevOf(mod('tests/test_a.py', ['+@pytest.mark.skipif(', '+    sys.platform == "win32",'])), ['test-skipped:low']);
+  assert.deepEqual(sevOf(mod('tests/test_a.py', ['+@unittest.skipIf(sys.version_info < (3, 9), "old")'])), ['test-skipped:low']);
+  assert.deepEqual(sevOf(mod('tests/test_a.py', ['+@pytest.mark.skip(reason="flaky")'])), ['test-skipped:high']);
+  assert.deepEqual(sevOf(mod('tests/test_a.py', ['+@pytest.mark.skipif(True, reason="later")'])), ['test-skipped:high']);
+});
+
+test('scoped suppressions that name one error are low, blanket ones are not', () => {
+  assert.deepEqual(sevOf(mod('src/a.py', ['+x = f()  # type: ignore[attr-defined]'])), ['suppression-added:low']);
+  assert.deepEqual(sevOf(mod('src/a.py', ['+x = f()  # type: ignore'])), ['suppression-added:medium']);
+  assert.deepEqual(sevOf(mod('src/a.py', ['+import os  # noqa: F401'])), ['suppression-added:low']);
+  assert.deepEqual(sevOf(mod('src/a.py', ['+import os  # noqa'])), ['suppression-added:medium']);
+  assert.deepEqual(sevOf(mod('src/A.java', ['+  @SuppressWarnings("unchecked")'])), ['suppression-added:low']);
+  assert.deepEqual(sevOf(mod('src/lib.rs', ['+#[allow(dead_code)]'])), ['suppression-added:low']);
+  assert.deepEqual(sevOf(mod('src/lib.rs', ['+#![allow(dead_code)]'])), ['suppression-added:medium']);
+  assert.deepEqual(sevOf(mod('src/a.ts', ['+// @ts-expect-error'])), ['suppression-added:low']);
+  assert.deepEqual(sevOf(mod('src/a.ts', ['+// @ts-ignore'])), ['suppression-added:medium']);
+  assert.deepEqual(sevOf(mod('src/a.ts', ['+/* eslint-disable */'])), ['suppression-added:high']);
+});
+
+test('a test file that was split into new files is not reported as deleted or as lost tests', () => {
+  const body = ["def test_open_file(runner):", "    result = runner.invoke(cli, ['open'])", "    assert result.exit_code == 0"];
+  const diff = deleted('tests/test_utils.py', body) + added('tests/test_utils_2/test_open_file.py', body);
+  assert.deepEqual(ids(diff), []);
+  // Without the new file the same deletion is reported.
+  assert.deepEqual(ids(deleted('tests/test_utils.py', body)), ['test-file-deleted']);
+});
+
+test('moving tests between files does not look like removing them', () => {
+  const t = ["def test_confirm_repeat(runner):", "    result = runner.invoke(cli, ['ask'])", "    assert result.output == 'A [y/n]: y'"];
+  const diff = mod('tests/test_utils.py', t.map((l) => `-${l}`), '70,3 +69,0') + mod('tests/test_prompt.py', t.map((l) => `+${l}`), '1,0 +1,3');
+  assert.deepEqual(ids(diff), []);
+  const lost = mod('tests/test_utils.py', t.map((l) => `-${l}`), '70,3 +69,0');
+  assert.deepEqual(ids(lost), ['test-removed']);
+});
+
+test('a deleted test helper with no test cases in it is low severity', () => {
+  assert.deepEqual(sevOf(deleted('tests/helpers_test.go', ['package tests', 'func newServer() *Server { return nil }'])), ['test-file-deleted:low']);
+});
+
+test('assertions removed together with their whole test are left to test-removed', () => {
+  const wholeTest = mod(
+    'tests/test_a.py',
+    ['-def test_old(runner):', '-    result = runner.invoke(cli)', '-    assert result.exit_code == 0'],
+    '10,3 +9,0',
+  );
+  assert.deepEqual(ids(wholeTest), ['test-removed']);
+  // Taking an assertion out of a test that stays is still the sneaky case.
+  const kept = mod('tests/test_a.py', ['-    assert result.exit_code == 0'], '12,1 +11,0');
+  assert.deepEqual(ids(kept), ['assertion-removed']);
 });

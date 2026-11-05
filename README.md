@@ -9,14 +9,14 @@ Cursor, Codex...) and needs no API key. Every rule is plain pattern matching, so
 
 | Rule id | Severity | Catches |
 |---|---|---|
-| `test-file-deleted` | high | A test file was deleted |
-| `test-skipped` | high | `it.skip`, `xit`, `@pytest.mark.skip`, `t.Skip`, `@Disabled`, `#[ignore]`... |
-| `assertion-removed` | high | More assertions removed from a test file than added |
+| `test-file-deleted` | high | A test file was deleted. Low if it held no test cases (helpers); ignored if its content was moved or split into other files in the same diff |
+| `test-skipped` | high | `it.skip`, `xit`, `@pytest.mark.skip`, `t.Skip`, `@Disabled`, `#[ignore]`... Conditional skips like `@pytest.mark.skipif(WIN, ...)` are low |
+| `assertion-removed` | high | More assertions removed from tests that remain than added (assertions that left with a whole removed test are reported by `test-removed`) |
 | `tautology-assertion` | high | `expect(true).toBe(true)`, `assert True`, `assert x == x` |
 | `assertion-weakened` | medium | A precise assertion replaced by `toBeTruthy()`, `expect.anything()`... |
 | `test-removed` | medium | More test cases removed than added |
 | `test-focused` | medium | `.only` / `fit` hides the rest of the suite |
-| `suppression-added` | medium / high | `@ts-ignore`, `eslint-disable`, `# type: ignore`, `# noqa`, `#[allow]`, coverage ignores. File-wide ones (`@ts-nocheck`, bare `eslint-disable`) are high |
+| `suppression-added` | low / medium / high | `@ts-ignore`, `eslint-disable`, `# type: ignore`, `# noqa`, `@SuppressWarnings`, coverage ignores. File-wide ones (`@ts-nocheck`, bare `eslint-disable`) are high. Ones that name a single error or rule (`# type: ignore[attr-defined]`, `# noqa: E501`, `@SuppressWarnings("unchecked")`) are low |
 | `empty-catch` | medium | `catch {}`, `except: pass`. Low when it looks deliberate (a named exception type, a comment, `.catch(() => {})`); skipped for cleanup calls like `File.Delete` |
 | `ci-weakened` | medium / high | `continue-on-error: true`, `\|\| true`, `--exit-zero`, a `test` script replaced by `echo` |
 | `ci-test-removed` | medium | A test command removed from a CI pipeline |

@@ -30,6 +30,11 @@ export interface FileDiff {
   oldPath?: string;
   status: FileStatus;
   binary: boolean;
+  /**
+   * How many removed lines were found again somewhere else in the same diff (a move or split).
+   * Those lines are turned into context lines before the rules run.
+   */
+  movedAway?: number;
   hunks: Hunk[];
 }
 
