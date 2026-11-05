@@ -10,7 +10,7 @@ Cursor, Codex...) and needs no API key. Every rule is plain pattern matching, so
 | Rule id | Severity | Catches |
 |---|---|---|
 | `test-file-deleted` | high | A test file was deleted. Low if it held no test cases (helpers); ignored if its content was moved or split into other files in the same diff |
-| `test-skipped` | high | `it.skip`, `xit`, `@pytest.mark.skip`, `t.Skip`, `@Disabled`, `#[ignore]`... Conditional skips like `@pytest.mark.skipif(WIN, ...)` are low |
+| `test-skipped` | high | `it.skip`, `xit`, `@pytest.mark.skip`, `t.Skip`, `@Disabled`, `#[ignore]`... Conditional skips are low: `@pytest.mark.skipif(WIN, ...)`, `XCTSkipIf`, or a skip call such as `markTestSkipped` or `t.Skip` inside an `if` |
 | `assertion-removed` | high | More assertions removed from tests that remain than added (assertions that left with a whole removed test are reported by `test-removed`) |
 | `tautology-assertion` | high | `expect(true).toBe(true)`, `assert True`, `assert x == x` |
 | `assertion-weakened` | medium | A precise assertion replaced by `toBeTruthy()`, `expect.anything()`, or a Python `assert a == b` reduced to `assert a`... |

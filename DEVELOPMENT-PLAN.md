@@ -36,14 +36,15 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
       high+medium findings 392 -> 44. Fixes: `@pytest.mark.skipif` was reported as a HIGH skip (30 of click's 32), moved or split tests counted as removed
       (lines cancelled across files in one diff), scoped suppressions (`# type: ignore[code]`, `# noqa: E501`, `@SuppressWarnings("x")`) are low,
       assertions removed with their whole test no longer double-reported, deleted helper files with no tests are low.
-- [ ] Still to measure: diffs from real agent sessions rather than human history, and Ruby, C#, PHP, Kotlin, Swift repos.
-- [ ] Remaining known noise: `t.Skip` guarded by an `if` (Go short mode), tests deleted because a feature or module moved to another repository. Also click merging several asserts into one parametrized test reads as a weakening.
+- [x] Measured Ruby (sinatra), PHP (guzzle), Swift (Alamofire), Kotlin (okio), C# (Newtonsoft.Json), 300 commits each: high+medium 415 -> 61. Fixes: skip calls inside an `if` are low (242 PHP findings; also solves Go short mode), bare `assertTrue(x)` is weak but `assertTrue(pred($x))` and comparisons are not (74), `#pragma warning disable CS0618` is scoped (54), Kotlin typed catch is low, `XCTSkip`/`XCTSkipIf` recognised. The six older repos went 44 -> 41, no regressions. 91 tests.
+- [ ] Still to measure: diffs from real agent sessions rather than human history.
+- [ ] Remaining known noise: tests deleted because a feature or module moved to another repository. Also click merging several asserts into one parametrized test reads as a weakening.
 - [x] Python assertion weakening: `assert a == b` reduced to `assert a` or `assert a is not None` is `assertion-weakened`, only when the hunk loses more precise asserts than it gains (reformatting and wrapped `assert (` are not flagged). First version gave 19 false alarms on requests and click; tightened to 1 across all six repos (click merging six asserts into one parametrized test). 72 tests passing.
 - [ ] Capture real agent diffs as fixtures: run Claude Code and Copilot on "make the failing test pass" in `.sandbox`, save with `git diff > test/fixtures/<name>.patch`, add the expectation to `expected.json`.
 - [ ] Known false alarm: regex/pattern tables in linting tools (this repo's own `rules.ts`) look like suppressions.
 - [ ] Keep every rule at one positive and one negative test minimum; no rule id renames.
 - [x] New rules: `coverage-lowered`, `timeout-inflated`, `retries-added` (before/after comparison of numbers, restricted to test files, test configs and CI). 0 false alarms on 203 real commits; caught 1 real timeout bump (20s to 60s).
-- [ ] Widen language coverage: Python (pytest/unittest), Go, Java/Kotlin (JUnit), Rust, C#, Ruby.
+- [x] Language coverage measured on real history: Python, Go, Java, Rust, Ruby, PHP, Swift, Kotlin, C#. Not yet measured: JavaScript/TypeScript apps beyond the sandbox and this repo, C/C++.
 
 ## Phase 3: Workflow features
 - [x] "Mark reviewed" for individual findings: check button in the view, a "mark as reviewed" quick fix, and a palette command. It adds the finding to the shared baseline file (`addToBaseline`), so the CLI and hooks honour it too. Integration test covers the quick fix. Note: *Set Baseline* overwrites earlier marks, but it re-captures every current finding anyway.

@@ -16,14 +16,39 @@ const TEST_DECL_RE =
 
 /** A test that is switched off. */
 const SKIP_RE =
-  /\b(?:it|test|describe|context|suite)\.skip\b|\bx(?:it|describe|test|context)\b\s*[('"`]|@pytest\.mark\.(?:skip|xfail)\b|@unittest\.(?:skip|expectedFailure)\b|\bpytest\.skip\(|\bself\.skipTest\(|\bt\.Skip(?:f|Now)?\(|@Disabled\b|@Ignore\b|#\[ignore\b|\bmarkTest(?:Skipped|Incomplete)\(/;
+  /\b(?:it|test|describe|context|suite)\.skip\b|\bx(?:it|describe|test|context)\b\s*[('"`]|@pytest\.mark\.(?:skip|xfail)\b|@unittest\.(?:skip|expectedFailure)\b|\bpytest\.skip\(|\bself\.skipTest\(|\bt\.Skip(?:f|Now)?\(|@Disabled\b|@Ignore\b|#\[ignore\b|\bmarkTest(?:Skipped|Incomplete)\(|\bXCTSkip\s*\(/;
 
 /**
  * Skips that only apply under a condition (a platform, a missing tool). They are a normal way to
  * write portable tests, so they are reported at low severity, unless the condition is a literal True.
  */
-const CONDITIONAL_SKIP_RE = /@pytest\.mark\.skipif\b|@unittest\.skip(?:If|Unless)\b/;
+const CONDITIONAL_SKIP_RE = /@pytest\.mark\.skipif\b|@unittest\.skip(?:If|Unless)\b|\bXCTSkip(?:If|Unless)\s*\(/;
 const ALWAYS_TRUE_SKIPIF_RE = /@pytest\.mark\.skipif\s*\(\s*(?:True|1)\s*[,)]|@unittest\.skipIf\s*\(\s*(?:True|1)\s*[,)]/;
+
+/** A skip written as a call (not an annotation), so it can sit inside an `if`. */
+const SKIP_CALL_RE = /\b(?:markTest(?:Skipped|Incomplete)|pytest\.skip|self\.skipTest|t\.Skip(?:f|Now)?|XCTSkip\w*)\s*\(/;
+
+/** A line that opens a condition: `if (...) {`, `} else {`, `unless`, `guard`. */
+const CONDITION_RE = /^\s*(?:\}\s*)?(?:if|else|elseif|elif|unless|guard)\b/;
+
+/**
+ * True when the added line at `index` sits right after a line that opens a condition, so the skip
+ * only happens in some environments (a missing extension, short mode). Looks back a few lines to
+ * allow multi-line conditions, and stops at the start of a test.
+ */
+function guardedByCondition(lines: DiffLine[], index: number): boolean {
+  const indent = (text: string): number => text.length - text.trimStart().length;
+  for (let i = index - 1; i >= Math.max(0, index - 4); i--) {
+    if (TEST_DECL_RE.test(lines[i].text)) {
+      return false;
+    }
+    // The condition must be less indented than the skip, so it encloses it.
+    if (CONDITION_RE.test(lines[i].text) && indent(lines[i].text) < indent(lines[index].text)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /** `.only` / `fit` run a single test and silently drop the rest of the suite. */
 const FOCUS_RE = /\b(?:it|test|describe|context)\.only\s*\(|\bf(?:it|describe|context)\s*\(/;
@@ -34,7 +59,7 @@ const TAUTOLOGY_RE =
 
 /** Matchers that accept almost any value; suspicious when they replace a precise check. */
 const WEAK_MATCHER_RE =
-  /\.(?:toBeTruthy|toBeFalsy|toBeDefined|toBeUndefined|toBeNull)\s*\(\s*\)|\bexpect\.(?:anything|any)\s*\(|\.not\.toThrow\s*\(\s*\)|\.toBeGreaterThan\s*\(\s*0\s*\)|\bassert(?:True|NotNone|IsNotNone|NotNull)\s*\(/;
+  /\.(?:toBeTruthy|toBeFalsy|toBeDefined|toBeUndefined|toBeNull)\s*\(\s*\)|\bexpect\.(?:anything|any)\s*\(|\.not\.toThrow\s*\(\s*\)|\.toBeGreaterThan\s*\(\s*0\s*\)|\bassert(?:NotNone|IsNotNone|NotNull)\s*\(|\bassertTrue\s*\(\s*(?:[\w$.[\]>:-]+|[\w$.>-]+\s*!==?\s*null)\s*[,)]/;
 
 /** A Python `assert` that compares a value (==, !=, <, in ...), the kind of check that is easy to water down. */
 const PY_PRECISE_ASSERT_RE = /^\s*assert\s.*(?:==|!=|<=|>=|[<>]|\bin\b)/;
@@ -68,7 +93,7 @@ const SUPPRESSIONS: { re: RegExp; label: string; severity: Severity; scoped?: Re
   { re: /\/\/\s*(?:nolint|NOLINT)\b|\/\/\s*biome-ignore\b|NOSONAR/, label: 'lint error suppressed', severity: 'medium', scoped: /nolint\s*:\s*\w|biome-ignore\s+lint\/\w/i },
   { re: /#!\[allow\(/, label: 'Rust warning silenced for the whole crate or module with #![allow(...)]', severity: 'medium' },
   { re: /#\[allow\(/, label: 'Rust warning silenced with #[allow(...)]', severity: 'low' },
-  { re: /@SuppressWarnings\b|#pragma\s+warning\s+disable|@phpstan-ignore|@psalm-suppress/, label: 'compiler or analyzer warning suppressed', severity: 'medium', scoped: /@SuppressWarnings\s*\(\s*[{"]/ },
+  { re: /@SuppressWarnings\b|#pragma\s+warning\s+disable|@phpstan-ignore|@psalm-suppress/, label: 'compiler or analyzer warning suppressed', severity: 'medium', scoped: /@SuppressWarnings\s*\(\s*[{"]|#pragma\s+warning\s+disable\s+\w+/ },
   { re: /(?:istanbul|c8|v8)\s+ignore\b|#\s*pragma:\s*no cover/, label: 'code excluded from coverage', severity: 'medium' },
 ];
 
@@ -85,7 +110,7 @@ const EXCEPT_OPEN_RE = /^\s*except\b[^:]*:\s*$/;
 const CLEANUP_RE = /\b(?:delete|remove|unlink|rmdir|rmSync|dispose|close|cleanup|kill|release|disconnect)\w*\s*\(/i;
 /** catch (TimeoutException) { }: naming one specific exception shows the author meant to ignore just that. */
 const TYPED_CATCH_RE =
-  /\bcatch\s*\(\s*(?!(?:final\s+)?(?:Exception|Throwable|Error|BaseException|SystemException|e|err|error|ex)\b)[A-Z]\w*(?:\.\w+)*(?:\s+\w+)?\s*\)/;
+  /\bcatch\s*\(\s*\w+\s*:\s*(?!(?:Exception|Throwable)\b)[A-Z]\w*|\bcatch\s*\(\s*(?!(?:final\s+)?(?:Exception|Throwable|Error|BaseException|SystemException|e|err|error|ex)\b)[A-Z]\w*(?:\.\w+)*(?:\s+\w+)?\s*\)/;
 /** Something written between the braces, which usually explains why. */
 const CATCH_COMMENT_RE = /\{\s*(?:\/\/\s*\S|\/\*\s*\S)/;
 
@@ -206,15 +231,19 @@ const testSkipped: Rule = {
       return [];
     }
     const out: Finding[] = [];
-    for (const l of added(file)) {
-      if (isCommentLine(l.text)) {
-        continue;
-      }
-      if (hits(SKIP_RE, l.text) || hits(ALWAYS_TRUE_SKIPIF_RE, l.text)) {
-        out.push(at(this.id, 'high', file, l, 'Test skipped or disabled'));
-      } else if (hits(CONDITIONAL_SKIP_RE, l.text)) {
-        out.push(at(this.id, 'low', file, l, 'Test skipped under a condition'));
-      }
+    for (const hunk of file.hunks) {
+      hunk.lines.forEach((l, i) => {
+        if (l.type !== 'add' || isCommentLine(l.text)) {
+          return;
+        }
+        if (hits(SKIP_CALL_RE, l.text) && guardedByCondition(hunk.lines, i)) {
+          out.push(at(this.id, 'low', file, l, 'Test skipped under a condition'));
+        } else if (hits(SKIP_RE, l.text) || hits(ALWAYS_TRUE_SKIPIF_RE, l.text)) {
+          out.push(at(this.id, 'high', file, l, 'Test skipped or disabled'));
+        } else if (hits(CONDITIONAL_SKIP_RE, l.text)) {
+          out.push(at(this.id, 'low', file, l, 'Test skipped under a condition'));
+        }
+      });
     }
     return out;
   },

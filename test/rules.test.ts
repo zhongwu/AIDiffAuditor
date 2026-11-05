@@ -356,3 +356,64 @@ test('an assertion replaced by assert True is reported once, as a tautology', ()
   const diff = mod('tests/test_a.py', ['-    assert total(1) == 3', '+    assert True']);
   assert.deepEqual(ids(diff), ['tautology-assertion']);
 });
+
+// --- found by auditing Ruby, PHP, Swift, Kotlin and C# history ----------------
+
+const severities = (diff: string): string[] => auditDiff(diff).map((f) => `${f.ruleId}:${f.severity}`);
+
+test('a skip call inside an if is a conditional skip (low), PHP and Go', () => {
+  const php = added('tests/ClientTest.php', [
+    '    public function testHttp2(): void',
+    '    {',
+    '        if (!defined("CURLOPT_PIPEWAIT")) {',
+    "            self::markTestSkipped('CURLOPT_PIPEWAIT is not available.');",
+    '        }',
+  ]);
+  assert.deepEqual(severities(php), ['test-skipped:low']);
+  const go = added('store/store_test.go', [
+    'func TestBig(t *testing.T) {',
+    '\tif testing.Short() {',
+    '\t\tt.Skip("short mode")',
+    '\t}',
+  ]);
+  assert.deepEqual(severities(go), ['test-skipped:low']);
+});
+
+test('a skip call with no enclosing condition stays high', () => {
+  const php = added('tests/ClientTest.php', [
+    '    public function testHttp2(): void',
+    '    {',
+    "        self::markTestSkipped('broken');",
+  ]);
+  assert.deepEqual(severities(php), ['test-skipped:high']);
+  // An earlier, already closed if does not count.
+  const closed = added('tests/ClientTest.php', [
+    '    if ($x) { setup(); }',
+    "    self::markTestSkipped('broken');",
+  ]);
+  assert.deepEqual(severities(closed), ['test-skipped:high']);
+});
+
+test('XCTSkip is a skip, XCTSkipIf is conditional', () => {
+  assert.deepEqual(severities(added('Tests/AFTests.swift', ['    func testA() throws {', '        throw XCTSkip("later")'])), ['test-skipped:high']);
+  assert.deepEqual(severities(added('Tests/AFTests.swift', ['    func testA() throws {', '        try XCTSkipIf(isCI)'])), ['test-skipped:low']);
+});
+
+test('assertTrue of a predicate or comparison is not a weakening, a bare assertTrue is', () => {
+  const precise = mod('tests/ClientTest.php', ['-        self::assertSame(State::REJECTED, $p->getState());', '+        self::assertTrue(State::isRejected($p));']);
+  assert.deepEqual(ids(precise), []);
+  const compare = mod('src/test/FooTest.kt', ['-        assertEquals(3, cursor.offset)', '+        assertTrue(cursor.offset > last)']);
+  assert.deepEqual(ids(compare), []);
+  const bare = mod('src/test/FooTest.java', ['-        assertEquals(3, result.size());', '+        assertTrue(result);']);
+  assert.deepEqual(ids(bare), ['assertion-weakened']);
+});
+
+test('#pragma warning disable with a warning code is low, a bare one is not', () => {
+  assert.deepEqual(severities(added('Src/Foo.cs', ['#pragma warning disable CS0618 // obsolete'])), ['suppression-added:low']);
+  assert.deepEqual(severities(added('Src/Foo.cs', ['#pragma warning disable'])), ['suppression-added:medium']);
+});
+
+test('a Kotlin catch of one named exception type is low', () => {
+  assert.deepEqual(severities(added('src/Socket.kt', ['    try { doWork() } catch (_: IOException) {}'])), ['empty-catch:low']);
+  assert.deepEqual(severities(added('src/Socket.kt', ['    try { doWork() } catch (e: Exception) {}'])), ['empty-catch:medium']);
+});
