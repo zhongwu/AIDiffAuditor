@@ -93,3 +93,8 @@ export async function baselinePath(cwd: string): Promise<string> {
   const p = (await git(['rev-parse', '--git-path', 'diffaudit-baseline.json'], root)).trim();
   return isAbsolute(p) ? p : join(root, p);
 }
+
+/** Absolute path of the repository that contains `cwd`. */
+export async function repoRoot(cwd: string): Promise<string> {
+  return (await git(['rev-parse', '--show-toplevel'], cwd)).trim();
+}

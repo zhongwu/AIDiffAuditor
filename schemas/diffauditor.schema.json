@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Diff Auditor team config",
+  "description": "Team defaults for the Agent Diff Auditor extension and the diffaudit CLI. Commit this file at the repository root.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "ignoreRules": {
+      "type": "array",
+      "description": "Rule ids to switch off for everyone on the team.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "test-file-deleted",
+          "test-skipped",
+          "test-focused",
+          "test-removed",
+          "assertion-removed",
+          "assertion-weakened",
+          "tautology-assertion",
+          "suppression-added",
+          "empty-catch",
+          "ci-weakened",
+          "ci-test-removed",
+          "coverage-lowered",
+          "timeout-inflated",
+          "retries-added"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "minSeverity": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "description": "Hide findings below this severity. A value set in VS Code settings or with --min-severity wins."
+    },
+    "ignorePaths": {
+      "type": "array",
+      "description": "Files left out of the audit, as gitignore-style globs relative to the repository root, for example \"legacy/**\" or \"**/*.generated.ts\".",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "baseRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ref to compare the working tree against, for example origin/main. A value set in VS Code settings or with --base wins."
+    }
+  }
+}

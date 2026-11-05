@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
 
@@ -57,6 +57,31 @@ export async function run(): Promise<void> {
     });
     const text = result.content.map((p) => (p instanceof vscode.LanguageModelTextPart ? p.value : '')).join('');
     assert.match(text, /a\.test\.js/);
+  });
+
+  await check('.diffauditor.json: ignorePaths and ignoreRules apply, and a bad file is reported', async () => {
+    const file = join(process.env.DIFFAUDIT_REPO as string, '.diffauditor.json');
+    try {
+      writeFileSync(file, JSON.stringify({ ignorePaths: ['app.ts'] }));
+      await vscode.commands.executeCommand('diffAuditor.audit');
+      assert.equal(diagnosticsFor('app.ts').length, 0, 'ignorePaths should hide app.ts');
+      assert.ok(diagnosticsFor('a.test.js').length > 0, 'other files stay');
+
+      writeFileSync(file, JSON.stringify({ ignoreRules: ['test-skipped'] }));
+      await vscode.commands.executeCommand('diffAuditor.audit');
+      assert.equal(diagnosticsFor('a.test.js').filter((d) => d.code === 'test-skipped').length, 0);
+      assert.ok(diagnosticsFor('app.ts').length > 0, 'app.ts is back');
+
+      writeFileSync(file, '{"oops":1}');
+      await vscode.commands.executeCommand('diffAuditor.audit');
+      const result = await vscode.lm.invokeTool('diffAuditor_auditChanges', { input: {}, toolInvocationToken: undefined });
+      const text = result.content.map((p) => (p instanceof vscode.LanguageModelTextPart ? p.value : '')).join('');
+      assert.match(text, /unknown option "oops"/);
+    } finally {
+      rmSync(file, { force: true });
+    }
+    await vscode.commands.executeCommand('diffAuditor.audit');
+    assert.ok(diagnosticsFor('app.ts').length > 0, 'removing the file restores defaults');
   });
 
   await check('quick fix marks one finding as reviewed and leaves the others', async () => {

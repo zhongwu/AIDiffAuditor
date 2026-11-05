@@ -59,4 +59,6 @@ export interface AuditOptions {
   ignoreRules?: string[];
   /** Drop findings below this severity. */
   minSeverity?: Severity;
+  /** Files to skip entirely, as gitignore-style globs relative to the repository root. */
+  ignorePaths?: string[];
 }

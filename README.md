@@ -56,6 +56,28 @@ Exit code is 1 when a finding reaches `--fail-on`, so it can gate a commit, an a
 `diffAuditor.baseRef` (default `HEAD`), `diffAuditor.includeUntracked`, `diffAuditor.minSeverity`,
 `diffAuditor.ignoreRules`, `diffAuditor.autoAudit` (re-audit on save).
 
+## Team config
+
+Commit a `.diffauditor.json` at the repository root so everyone, the editor, the CLI, CI and the agent hooks, uses the same defaults:
+
+```json
+{
+  "ignoreRules": ["retries-added"],
+  "minSeverity": "medium",
+  "ignorePaths": ["legacy/**", "**/*.generated.ts"],
+  "baseRef": "origin/main"
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `ignoreRules` | Rule ids switched off for the team. Added to `diffAuditor.ignoreRules` and `--ignore`. A misspelled id gives a warning. |
+| `minSeverity` | Hide findings below this level. A value you set in VS Code settings, or `--min-severity`, wins. |
+| `ignorePaths` | gitignore-style globs relative to the repo root: `*` stays in one folder, `**` crosses folders, a pattern with no `/` matches at any depth, a trailing `/` means everything under it. |
+| `baseRef` | What to compare against, for example `origin/main`. A value you set in VS Code settings, or `--base`, wins. |
+
+Unknown keys and wrong types are errors with a message that names the problem, so a typo never silently turns a check off. VS Code validates and completes the file as you type.
+
 ## Develop
 
 ```bash

@@ -154,6 +154,12 @@
           }
         }
       }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": ".diffauditor.json",
+        "url": "./schemas/diffauditor.schema.json"
+      }
     ]
   },
   "scripts": {

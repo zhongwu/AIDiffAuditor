@@ -1,3 +1,4 @@
+import { pathMatcher } from './config';
 import { parseDiff } from './diffParser';
 import { isIgnoredPath } from './patterns';
 import { RULES } from './rules';
@@ -58,7 +59,9 @@ export function auditDiff(diffText: string, options: AuditOptions = {}): Finding
   const findings: Finding[] = [];
   const seen = new Set<string>();
 
-  const files = parseDiff(diffText);
+  const isIgnored = pathMatcher(options.ignorePaths);
+  // Leave ignored files out before moved lines are matched, so they cannot cancel anything either.
+  const files = parseDiff(diffText).filter((f) => !isIgnored(f.path));
   cancelMovedLines(files);
   for (const file of files) {
     if (file.binary || isIgnoredPath(file.path)) {

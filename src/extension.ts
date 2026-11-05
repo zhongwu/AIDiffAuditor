@@ -7,7 +7,8 @@ import { addToBaseline, createBaseline, newSinceBaseline, parseBaseline } from '
 import { countBySeverity, formatFindings } from './core/format';
 import { SEVERITY_RANK } from './core/types';
 import type { Finding, Severity } from './core/types';
-import { baselinePath, collectDiff } from './git';
+import { loadConfig } from './config';
+import { baselinePath, collectDiff, repoRoot } from './git';
 
 interface LocatedFinding extends Finding {
   uri: vscode.Uri;
@@ -71,6 +72,40 @@ export function activate(context: vscode.ExtensionContext): void {
     return folder;
   }
 
+  const warned = new Set<string>();
+
+  /**
+   * Combines the team's `.diffauditor.json` with the user's VS Code settings. A setting the user
+   * changed explicitly wins for `minSeverity` and `baseRef`; rule ids to ignore are added together.
+   */
+  async function resolveSettings(cwd: string): Promise<{
+    baseRef: string;
+    includeUntracked: boolean;
+    ignoreRules: string[];
+    ignorePaths: string[];
+    minSeverity: Severity;
+  }> {
+    const cfg = vscode.workspace.getConfiguration('diffAuditor');
+    const explicit = <T>(key: string): T | undefined => {
+      const i = cfg.inspect<T>(key);
+      return i?.workspaceFolderValue ?? i?.workspaceValue ?? i?.globalValue;
+    };
+    const { config, warnings } = await loadConfig(await repoRoot(cwd));
+    for (const w of warnings) {
+      if (!warned.has(w)) {
+        warned.add(w);
+        void vscode.window.showWarningMessage(`Diff Auditor: ${w}`);
+      }
+    }
+    return {
+      baseRef: explicit<string>('baseRef') || config.baseRef || 'HEAD',
+      includeUntracked: cfg.get<boolean>('includeUntracked', true),
+      ignoreRules: [...(config.ignoreRules ?? []), ...cfg.get<string[]>('ignoreRules', [])],
+      ignorePaths: config.ignorePaths ?? [],
+      minSeverity: explicit<Severity>('minSeverity') ?? config.minSeverity ?? 'low',
+    };
+  }
+
   /**
    * Audits the working tree. The saved baseline (shared with the diffaudit CLI and the agent hooks)
    * hides findings that existed when it was saved; `hidden` says how many that was. An explicit
@@ -79,14 +114,14 @@ export function activate(context: vscode.ExtensionContext): void {
   async function runAudit(
     baseRefOverride?: string,
   ): Promise<{ root: string; findings: Finding[]; hidden: number }> {
-    const cfg = vscode.workspace.getConfiguration('diffAuditor');
     const cwd = pickFolder().uri.fsPath;
+    const s = await resolveSettings(cwd);
     const { root, diff } = await collectDiff({
       cwd,
-      baseRef: baseRefOverride || cfg.get<string>('baseRef', 'HEAD'),
-      includeUntracked: cfg.get<boolean>('includeUntracked', true),
+      baseRef: baseRefOverride || s.baseRef,
+      includeUntracked: s.includeUntracked,
     });
-    const all = auditDiff(diff, { ignoreRules: cfg.get<string[]>('ignoreRules', []) });
+    const all = auditDiff(diff, { ignoreRules: s.ignoreRules, ignorePaths: s.ignorePaths });
     let visible = all;
     if (!baseRefOverride) {
       const file = await baselinePath(cwd);
@@ -98,7 +133,7 @@ export function activate(context: vscode.ExtensionContext): void {
         }
       }
     }
-    const minRank = SEVERITY_RANK[cfg.get<Severity>('minSeverity', 'low')];
+    const minRank = SEVERITY_RANK[s.minSeverity];
     return {
       root,
       findings: visible.filter((f) => SEVERITY_RANK[f.severity] >= minRank),
@@ -172,13 +207,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('diffAuditor.setBaseline', async () => {
       try {
         const cwd = pickFolder().uri.fsPath;
-        const cfg = vscode.workspace.getConfiguration('diffAuditor');
-        const { diff } = await collectDiff({
-          cwd,
-          baseRef: cfg.get<string>('baseRef', 'HEAD'),
-          includeUntracked: cfg.get<boolean>('includeUntracked', true),
-        });
-        const findings = auditDiff(diff, { ignoreRules: cfg.get<string[]>('ignoreRules', []) });
+        const s = await resolveSettings(cwd);
+        const { diff } = await collectDiff({ cwd, baseRef: s.baseRef, includeUntracked: s.includeUntracked });
+        const findings = auditDiff(diff, { ignoreRules: s.ignoreRules, ignorePaths: s.ignorePaths });
         await writeFile(await baselinePath(cwd), JSON.stringify(createBaseline(findings), null, 2));
         await auditAndShow(false);
         void vscode.window.showInformationMessage(
