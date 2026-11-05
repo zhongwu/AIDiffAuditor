@@ -351,3 +351,8 @@ test('reformatting python asserts is not a weakening', () => {
   const wrapped = mod('tests/test_a.py', ['-    assert out == 1', '+    assert (', '+        out == 1', '+    )']);
   assert.deepEqual(ids(wrapped), []);
 });
+
+test('an assertion replaced by assert True is reported once, as a tautology', () => {
+  const diff = mod('tests/test_a.py', ['-    assert total(1) == 3', '+    assert True']);
+  assert.deepEqual(ids(diff), ['tautology-assertion']);
+});

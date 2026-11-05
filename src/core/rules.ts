@@ -290,7 +290,14 @@ const assertionWeakened: Rule = {
       const preciseKept = hunk.lines.filter((l) => l.type === 'add' && PY_PRECISE_ASSERT_RE.test(l.text)).length;
       const pyPrecise = preciseGone > preciseKept;
       // One finding per hunk: a rewrite that weakens ten lines is one problem, not ten.
-      const weak = hunk.lines.filter((l) => l.type === 'add' && !isCommentLine(l.text) && (WEAK_MATCHER_RE.test(l.text) || (pyPrecise && pyWeakAssert(l.text))));
+      // Lines that can never fail are reported by tautology-assertion, not twice.
+      const weak = hunk.lines.filter(
+        (l) =>
+          l.type === 'add' &&
+          !isCommentLine(l.text) &&
+          !TAUTOLOGY_RE.test(l.text) &&
+          (WEAK_MATCHER_RE.test(l.text) || (pyPrecise && pyWeakAssert(l.text))),
+      );
       if (weak.length > 0) {
         const message =
           weak.length > 1

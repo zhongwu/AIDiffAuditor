@@ -28,7 +28,7 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [ ] Fix what breaks; add tests for anything fixable in `src/core`.
 
 ## Phase 2: Rule quality
-- [~] Fixture corpus: `test/fixtures/*.patch` with `expected.json`, run by `test/fixtures.test.ts` (10 diffs: 7 shortcut patterns, 3 clean). These are hand-written in the shape of typical agent output, not captured from real sessions, so they guard against regressions but do not prove coverage. Next: replace or add diffs captured from real Claude Code and Copilot runs. Writing them found one real miss (Python `assert a == b` weakened to `assert a`), now fixed.
+- [~] Fixture corpus: `test/fixtures/*.patch` with `expected.json`, run by `test/fixtures.test.ts` (19 diffs: 14 shortcut patterns across JS/TS, Python, Go, Java, Rust, CI and configs, 5 clean). These are hand-written in the shape of typical agent output, not captured from real sessions, so they guard against regressions but do not prove coverage. Next: replace or add diffs captured from real Claude Code and Copilot runs. Writing them found one real miss (Python `assert a == b` weakened to `assert a`), now fixed.
 - [x] First false-positive pass: `node scripts/audit-history.js <repo>...` audits every past commit of real repos (read-only).
       On 5 repos / 203 commits: 37 findings -> 27, and only 9 at medium or above (18 are low). Fixed: docs mentioning `it.skip`
       flagged HIGH, patterns inside string literals, one finding per weakened hunk, empty-catch noise (cleanup skipped, typed/commented/promise catches low).

@@ -1,0 +1,27 @@
+diff --git a/cache/cache.go b/cache/cache.go
+new file mode 100644
+index 0000000..4d5e6f7
+--- /dev/null
++++ b/cache/cache.go
+@@ -0,0 +1,5 @@
++package cache
++
++func Get(m map[string]int, k string) (int, bool) {
++	v, ok := m[k]
++	return v, ok
++}
+diff --git a/cache/cache_test.go b/cache/cache_test.go
+new file mode 100644
+index 0000000..4d5e6f7
+--- /dev/null
++++ b/cache/cache_test.go
+@@ -0,0 +1,9 @@
++package cache
++
++import "testing"
++
++func TestGetMissing(t *testing.T) {
++	if _, ok := Get(map[string]int{}, "x"); ok {
++		t.Errorf("expected miss")
++	}
++}

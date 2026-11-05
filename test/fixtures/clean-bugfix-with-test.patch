@@ -1,0 +1,20 @@
+diff --git a/src/pager.ts b/src/pager.ts
+index 3a1b2c3..4d5e6f7 100644
+--- a/src/pager.ts
++++ b/src/pager.ts
+@@ -6,3 +6,3 @@
+ export function pageCount(total: number, size: number): number {
+-  return Math.floor(total / size);
++  return Math.ceil(total / size);
+ }
+diff --git a/src/pager.test.ts b/src/pager.test.ts
+index 3a1b2c3..4d5e6f7 100644
+--- a/src/pager.test.ts
++++ b/src/pager.test.ts
+@@ -4,3 +4,6 @@
+ it('counts full pages', () => {
+   expect(pageCount(20, 10)).toBe(2);
+ });
++it('counts a partial last page', () => {
++  expect(pageCount(21, 10)).toBe(3);
++});

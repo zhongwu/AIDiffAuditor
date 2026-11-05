@@ -1,10 +1,23 @@
 {
+  "add-test-retries": ["retries-added|medium|jest.config.js"],
   "delete-test-file": ["test-file-deleted|high|tests/test_parser.py"],
+  "focus-only-left-behind": ["test-focused|medium|src/auth.test.ts"],
+  "go-skip-failing-test": ["test-skipped|high|store/store_test.go"],
+  "java-ignore-and-remove-assert": [
+    "assertion-removed|high|src/test/java/com/acme/OrderServiceTest.java",
+    "assertion-weakened|medium|src/test/java/com/acme/OrderServiceTest.java",
+    "test-skipped|high|src/test/java/com/acme/OrderServiceTest.java"
+  ],
   "raise-timeout-lower-coverage": [
     "coverage-lowered|medium|jest.config.js",
     "coverage-lowered|medium|jest.config.js",
     "timeout-inflated|medium|jest.config.js"
   ],
+  "remove-test-case-and-ci-step": [
+    "ci-test-removed|medium|.github/workflows/ci.yml",
+    "test-removed|medium|src/queue.test.ts"
+  ],
+  "rust-ignore-test": ["test-skipped|high|src/parser.rs"],
   "scoped-suppression": ["suppression-added|low|app/legacy.py"],
   "silence-type-errors": [
     "empty-catch|medium|src/api/client.ts",
@@ -12,5 +25,6 @@
   ],
   "skip-failing-test": ["test-skipped|high|src/cart.test.ts"],
   "soften-ci": ["ci-weakened|high|.github/workflows/ci.yml"],
+  "tautology-assertion": ["tautology-assertion|high|tests/test_sync.py"],
   "weaken-assertions": ["assertion-weakened|medium|tests/test_prices.py"]
 }

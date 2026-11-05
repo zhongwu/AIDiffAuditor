@@ -1,0 +1,9 @@
+diff --git a/src/auth.test.ts b/src/auth.test.ts
+index 3a1b2c3..4d5e6f7 100644
+--- a/src/auth.test.ts
++++ b/src/auth.test.ts
+@@ -30,3 +30,3 @@ describe('auth', () => {
+-  it('rejects an expired token', () => {
++  it.only('rejects an expired token', () => {
+     expect(verify(expiredToken)).toBe(false);
+   });
