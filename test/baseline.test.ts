@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { auditDiff } from '../src/core/audit';
+import { formatFindings } from '../src/core/format';
 import { createBaseline, newSinceBaseline, parseBaseline } from '../src/core/baseline';
 import { mod } from './helpers';
 
@@ -41,4 +42,11 @@ test('baseline files survive a round trip and bad files are rejected', () => {
   const baseline = createBaseline(findings);
   assert.deepEqual(parseBaseline(JSON.stringify(baseline)), baseline);
   assert.throws(() => parseBaseline('{"hello":1}'), /baseline/i);
+});
+
+test('the report says how many findings the baseline hid', () => {
+  const findings = auditDiff(skipped("it.skip('works', () => {});"));
+  assert.match(formatFindings(findings, 50, 3), /3 existing finding\(s\) hidden by the saved baseline/);
+  assert.match(formatFindings([], 50, 2), /no suspicious changes found.*2 existing/s);
+  assert.doesNotMatch(formatFindings(findings), /hidden/);
 });

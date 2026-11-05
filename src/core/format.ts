@@ -9,9 +9,10 @@ export function countBySeverity(findings: Finding[]): Record<Severity, number> {
 }
 
 /** Plain-text report used by the CLI and by the language-model tool. */
-export function formatFindings(findings: Finding[], limit = 50): string {
+export function formatFindings(findings: Finding[], limit = 50, hidden = 0): string {
+  const note = hidden > 0 ? `\n(${hidden} existing finding(s) hidden by the saved baseline.)` : '';
   if (findings.length === 0) {
-    return 'Diff Auditor: no suspicious changes found.';
+    return `Diff Auditor: no suspicious changes found.${note}`;
   }
   const c = countBySeverity(findings);
   const lines = [
@@ -23,5 +24,5 @@ export function formatFindings(findings: Finding[], limit = 50): string {
   if (findings.length > limit) {
     lines.push(`...and ${findings.length - limit} more.`);
   }
-  return lines.join('\n');
+  return lines.join('\n') + note;
 }

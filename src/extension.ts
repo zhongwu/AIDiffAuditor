@@ -1,9 +1,13 @@
+import { existsSync } from 'node:fs';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
 import { auditDiff } from './core/audit';
+import { createBaseline, newSinceBaseline, parseBaseline } from './core/baseline';
 import { countBySeverity, formatFindings } from './core/format';
+import { SEVERITY_RANK } from './core/types';
 import type { Finding, Severity } from './core/types';
-import { collectDiff } from './git';
+import { baselinePath, collectDiff } from './git';
 
 interface LocatedFinding extends Finding {
   uri: vscode.Uri;
@@ -62,21 +66,42 @@ export function activate(context: vscode.ExtensionContext): void {
     return folder;
   }
 
-  async function runAudit(baseRefOverride?: string): Promise<{ root: string; findings: Finding[] }> {
+  /**
+   * Audits the working tree. The saved baseline (shared with the diffaudit CLI and the agent hooks)
+   * hides findings that existed when it was saved; `hidden` says how many that was. An explicit
+   * base ref skips the baseline, because whoever asks for a different comparison wants the full picture.
+   */
+  async function runAudit(
+    baseRefOverride?: string,
+  ): Promise<{ root: string; findings: Finding[]; hidden: number }> {
     const cfg = vscode.workspace.getConfiguration('diffAuditor');
+    const cwd = pickFolder().uri.fsPath;
     const { root, diff } = await collectDiff({
-      cwd: pickFolder().uri.fsPath,
+      cwd,
       baseRef: baseRefOverride || cfg.get<string>('baseRef', 'HEAD'),
       includeUntracked: cfg.get<boolean>('includeUntracked', true),
     });
-    const findings = auditDiff(diff, {
-      ignoreRules: cfg.get<string[]>('ignoreRules', []),
-      minSeverity: cfg.get<Severity>('minSeverity', 'low'),
-    });
-    return { root, findings };
+    const all = auditDiff(diff, { ignoreRules: cfg.get<string[]>('ignoreRules', []) });
+    let visible = all;
+    if (!baseRefOverride) {
+      const file = await baselinePath(cwd);
+      if (existsSync(file)) {
+        try {
+          visible = newSinceBaseline(all, parseBaseline(await readFile(file, 'utf8')));
+        } catch {
+          throw new Error('The saved baseline cannot be read. Run "Diff Auditor: Clear Baseline" and set it again.');
+        }
+      }
+    }
+    const minRank = SEVERITY_RANK[cfg.get<Severity>('minSeverity', 'low')];
+    return {
+      root,
+      findings: visible.filter((f) => SEVERITY_RANK[f.severity] >= minRank),
+      hidden: all.length - visible.length,
+    };
   }
 
-  function publish(root: string, findings: Finding[]): void {
+  function publish(root: string, findings: Finding[], hidden = 0): void {
     const located = findings.map((f) => ({ ...f, uri: vscode.Uri.file(join(root, f.file)) }));
 
     diagnostics.clear();
@@ -102,15 +127,17 @@ export function activate(context: vscode.ExtensionContext): void {
     provider.set(located);
     const counts = countBySeverity(findings);
     treeView.message = findings.length === 0 ? 'No suspicious changes found.' : undefined;
+    treeView.description = hidden > 0 ? `${hidden} hidden by baseline` : undefined;
     treeView.badge = findings.length ? { value: findings.length, tooltip: `${counts.high} high severity` } : undefined;
     status.text = findings.length === 0 ? '$(shield) Diff Audit: clean' : `$(shield) Diff Audit: ${findings.length} (${counts.high} high)`;
+    status.tooltip = hidden > 0 ? `Audit uncommitted changes for agent shortcuts (${hidden} existing finding(s) hidden by the baseline)` : 'Audit uncommitted changes for agent shortcuts';
     status.backgroundColor = counts.high > 0 ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
   }
 
   async function auditAndShow(interactive: boolean): Promise<void> {
     try {
-      const { root, findings } = await runAudit();
-      publish(root, findings);
+      const { root, findings, hidden } = await runAudit();
+      publish(root, findings, hidden);
       if (interactive) {
         if (findings.length > 0) {
           await vscode.commands.executeCommand('diffAuditor.findings.focus');
@@ -137,10 +164,39 @@ export function activate(context: vscode.ExtensionContext): void {
         auditAndShow(true),
       ),
     ),
+    vscode.commands.registerCommand('diffAuditor.setBaseline', async () => {
+      try {
+        const cwd = pickFolder().uri.fsPath;
+        const cfg = vscode.workspace.getConfiguration('diffAuditor');
+        const { diff } = await collectDiff({
+          cwd,
+          baseRef: cfg.get<string>('baseRef', 'HEAD'),
+          includeUntracked: cfg.get<boolean>('includeUntracked', true),
+        });
+        const findings = auditDiff(diff, { ignoreRules: cfg.get<string[]>('ignoreRules', []) });
+        await writeFile(await baselinePath(cwd), JSON.stringify(createBaseline(findings), null, 2));
+        await auditAndShow(false);
+        void vscode.window.showInformationMessage(
+          `Diff Auditor: baseline saved. ${findings.length} existing finding(s) will be hidden; only new ones are reported.`,
+        );
+      } catch (err) {
+        void vscode.window.showErrorMessage(`Diff Auditor: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }),
+    vscode.commands.registerCommand('diffAuditor.clearBaseline', async () => {
+      try {
+        await rm(await baselinePath(pickFolder().uri.fsPath), { force: true });
+        await auditAndShow(false);
+        void vscode.window.showInformationMessage('Diff Auditor: baseline cleared. All findings are shown again.');
+      } catch (err) {
+        void vscode.window.showErrorMessage(`Diff Auditor: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }),
     vscode.commands.registerCommand('diffAuditor.clear', () => {
       diagnostics.clear();
       provider.set([]);
       treeView.badge = undefined;
+      treeView.description = undefined;
       treeView.message = 'Run "Diff Auditor: Audit Changes" to scan your uncommitted changes.';
       status.text = '$(shield) Diff Audit';
       status.backgroundColor = undefined;
@@ -167,9 +223,11 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.lm.registerTool<{ baseRef?: string }>('diffAuditor_auditChanges', {
         async invoke(options) {
           try {
-            const { root, findings } = await runAudit(options.input?.baseRef);
-            publish(root, findings);
-            return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart(formatFindings(findings))]);
+            const { root, findings, hidden } = await runAudit(options.input?.baseRef);
+            publish(root, findings, hidden);
+            return new vscode.LanguageModelToolResult([
+              new vscode.LanguageModelTextPart(formatFindings(findings, 50, hidden)),
+            ]);
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             return new vscode.LanguageModelToolResult([

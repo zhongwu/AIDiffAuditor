@@ -39,6 +39,14 @@
       {
         "command": "diffAuditor.clear",
         "title": "Diff Auditor: Clear Findings"
+      },
+      {
+        "command": "diffAuditor.setBaseline",
+        "title": "Diff Auditor: Set Baseline (Hide Current Findings)"
+      },
+      {
+        "command": "diffAuditor.clearBaseline",
+        "title": "Diff Auditor: Clear Baseline (Show All Findings)"
       }
     ],
     "views": {
@@ -56,6 +64,16 @@
           "command": "diffAuditor.audit",
           "when": "view == diffAuditor.findings",
           "group": "navigation"
+        },
+        {
+          "command": "diffAuditor.setBaseline",
+          "when": "view == diffAuditor.findings",
+          "group": "baseline@1"
+        },
+        {
+          "command": "diffAuditor.clearBaseline",
+          "when": "view == diffAuditor.findings",
+          "group": "baseline@2"
         }
       ]
     },
@@ -108,7 +126,7 @@
         "displayName": "Audit Working-Tree Changes",
         "canBeReferencedInPrompt": true,
         "userDescription": "Scan uncommitted changes for shortcuts such as skipped tests, weakened assertions and suppressed errors.",
-        "modelDescription": "Scans the git diff of the current workspace for shortcuts that make a task look finished without actually being finished: deleted or skipped tests, removed or weakened assertions, newly added @ts-ignore / eslint-disable / noqa suppressions, empty catch blocks and CI checks that were softened. Call it before telling the user a task is done, and fix or explicitly justify every finding it reports.",
+        "modelDescription": "Scans the git diff of the current workspace for shortcuts that make a task look finished without actually being finished: deleted or skipped tests, removed or weakened assertions, newly added @ts-ignore / eslint-disable / noqa suppressions, empty catch blocks and CI checks that were softened. Call it before telling the user a task is done, and fix or explicitly justify every finding it reports. If the user saved a baseline, findings that existed before it are hidden and only new ones are reported.",
         "inputSchema": {
           "type": "object",
           "properties": {

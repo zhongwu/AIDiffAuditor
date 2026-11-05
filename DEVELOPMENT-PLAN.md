@@ -24,7 +24,7 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [x] Gap found: the audit reported every uncommitted change, so an agent could not tell its own changes from pre-existing ones.
       Fixed with a session baseline: `diffaudit --save-baseline` / `--baseline` (stored in `.git/`, matched by rule+file+content, not line),
       and Claude Code SessionStart + Stop hooks. Unit tested, and confirmed in a live Claude Code session: old findings did not block, a newly added `it.skip` did (only that one reported).
-- [ ] Baseline in the VS Code UI (command "Set baseline", tree/status bar show only new findings) and in the `diffAuditor_auditChanges` tool.
+- [x] Baseline in the VS Code extension and the `diffAuditor_auditChanges` tool: "Set Baseline" / "Clear Baseline" commands (view title menu), shared with the CLI and hooks, panel and status bar show how many are hidden. Covered by unit and integration tests; manual look in the F5 window still to do.
 - [ ] Fix what breaks; add tests for anything fixable in `src/core`.
 
 ## Phase 2: Rule quality
@@ -35,7 +35,7 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [ ] Widen language coverage: Python (pytest/unittest), Go, Java/Kotlin (JUnit), Rust, C#, Ruby.
 
 ## Phase 3: Workflow features
-- [ ] "Mark reviewed" action so accepted findings stop reappearing.
+- [ ] "Mark reviewed" for individual findings (accept one without baselining everything). The session baseline already covers the "ignore everything that exists now" case.
 - [ ] Shared team config file (committed, e.g. `.diffauditor.json`) read by both extension and CLI.
 - [ ] Baseline / compare against a chosen ref (branch or commit), not just working tree.
 - [ ] CLI polish: JSON and SARIF output, docs for pre-commit hook and CI use.

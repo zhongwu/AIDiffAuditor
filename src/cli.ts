@@ -75,6 +75,7 @@ async function main(): Promise<void> {
     ? readFileSync(0, 'utf8')
     : (await collectDiff({ cwd: process.cwd(), baseRef: base, includeUntracked: untracked })).diff;
   let findings = auditDiff(diff, { ignoreRules });
+  let hidden = 0;
 
   if (saveBaseline) {
     const file = await baselinePath(process.cwd());
@@ -87,10 +88,12 @@ async function main(): Promise<void> {
     if (!existsSync(file)) {
       throw new Error('No baseline saved yet. Run "diffaudit --save-baseline" first.');
     }
+    const total = findings.length;
     findings = newSinceBaseline(findings, parseBaseline(readFileSync(file, 'utf8')));
+    hidden = total - findings.length;
   }
 
-  console.log(json ? JSON.stringify(findings, null, 2) : formatFindings(findings, Infinity));
+  console.log(json ? JSON.stringify(findings, null, 2) : formatFindings(findings, Infinity, hidden));
   if (failOn !== 'never' && findings.some((f) => SEVERITY_RANK[f.severity] >= SEVERITY_RANK[failOn])) {
     process.exitCode = 1;
   }
