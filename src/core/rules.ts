@@ -36,6 +36,22 @@ const TAUTOLOGY_RE =
 const WEAK_MATCHER_RE =
   /\.(?:toBeTruthy|toBeFalsy|toBeDefined|toBeUndefined|toBeNull)\s*\(\s*\)|\bexpect\.(?:anything|any)\s*\(|\.not\.toThrow\s*\(\s*\)|\.toBeGreaterThan\s*\(\s*0\s*\)|\bassert(?:True|NotNone|IsNotNone|NotNull)\s*\(/;
 
+/** A Python `assert` that compares a value (==, !=, <, in ...), the kind of check that is easy to water down. */
+const PY_PRECISE_ASSERT_RE = /^\s*assert\s.*(?:==|!=|<=|>=|[<>]|\bin\b)/;
+
+/** A Python `assert` that only checks truthiness or `is not None`. */
+const pyWeakAssert = (text: string): boolean => {
+  const m = /^\s*assert\s+(.+?)\s*(?:,.*)?$/.exec(text);
+  if (!m) {
+    return false;
+  }
+  const expr = m[1];
+  if (/[([{\\]$/.test(expr)) {
+    return false; // the expression continues on the next line
+  }
+  return /\bis\s+not\s+None$/.test(expr) || !/==|!=|<=|>=|[<>]|\bin\b|\bis\b|\bnot\b/.test(expr);
+};
+
 /**
  * Suppression comments. A `scoped` match names one specific error or lint rule, which is a
  * deliberate and targeted choice, so it is reported at low severity. Blanket ones keep `severity`.
@@ -269,8 +285,12 @@ const assertionWeakened: Rule = {
       if (!hunk.lines.some((l) => l.type === 'del' && isAssertion(l))) {
         continue;
       }
+      // A bare python assert only counts as weaker when the hunk lost more precise asserts than it gained.
+      const preciseGone = hunk.lines.filter((l) => l.type === 'del' && PY_PRECISE_ASSERT_RE.test(l.text)).length;
+      const preciseKept = hunk.lines.filter((l) => l.type === 'add' && PY_PRECISE_ASSERT_RE.test(l.text)).length;
+      const pyPrecise = preciseGone > preciseKept;
       // One finding per hunk: a rewrite that weakens ten lines is one problem, not ten.
-      const weak = hunk.lines.filter((l) => l.type === 'add' && !isCommentLine(l.text) && WEAK_MATCHER_RE.test(l.text));
+      const weak = hunk.lines.filter((l) => l.type === 'add' && !isCommentLine(l.text) && (WEAK_MATCHER_RE.test(l.text) || (pyPrecise && pyWeakAssert(l.text))));
       if (weak.length > 0) {
         const message =
           weak.length > 1

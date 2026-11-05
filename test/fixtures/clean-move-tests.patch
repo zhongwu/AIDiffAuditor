@@ -1,0 +1,24 @@
+diff --git a/tests/test_utils.py b/tests/test_utils.py
+deleted file mode 100644
+index 3a1b2c3..0000000
+--- a/tests/test_utils.py
++++ /dev/null
+@@ -1,6 +0,0 @@
+-from app.utils import clamp
+-
+-def test_clamp_low():
+-    assert clamp(-1, 0, 10) == 0
+-def test_clamp_high():
+-    assert clamp(11, 0, 10) == 10
+diff --git a/tests/utils/test_clamp.py b/tests/utils/test_clamp.py
+new file mode 100644
+index 0000000..3a1b2c3
+--- /dev/null
++++ b/tests/utils/test_clamp.py
+@@ -0,0 +1,6 @@
++from app.utils import clamp
++
++def test_clamp_low():
++    assert clamp(-1, 0, 10) == 0
++def test_clamp_high():
++    assert clamp(11, 0, 10) == 10

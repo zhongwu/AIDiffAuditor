@@ -13,7 +13,7 @@ Cursor, Codex...) and needs no API key. Every rule is plain pattern matching, so
 | `test-skipped` | high | `it.skip`, `xit`, `@pytest.mark.skip`, `t.Skip`, `@Disabled`, `#[ignore]`... Conditional skips like `@pytest.mark.skipif(WIN, ...)` are low |
 | `assertion-removed` | high | More assertions removed from tests that remain than added (assertions that left with a whole removed test are reported by `test-removed`) |
 | `tautology-assertion` | high | `expect(true).toBe(true)`, `assert True`, `assert x == x` |
-| `assertion-weakened` | medium | A precise assertion replaced by `toBeTruthy()`, `expect.anything()`... |
+| `assertion-weakened` | medium | A precise assertion replaced by `toBeTruthy()`, `expect.anything()`, or a Python `assert a == b` reduced to `assert a`... |
 | `test-removed` | medium | More test cases removed than added |
 | `test-focused` | medium | `.only` / `fit` hides the rest of the suite |
 | `suppression-added` | low / medium / high | `@ts-ignore`, `eslint-disable`, `# type: ignore`, `# noqa`, `@SuppressWarnings`, coverage ignores. File-wide ones (`@ts-nocheck`, bare `eslint-disable`) are high. Ones that name a single error or rule (`# type: ignore[attr-defined]`, `# noqa: E501`, `@SuppressWarnings("unchecked")`) are low |

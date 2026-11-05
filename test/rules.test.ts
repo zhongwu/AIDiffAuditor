@@ -317,3 +317,37 @@ test('assertions removed together with their whole test are left to test-removed
   const kept = mod('tests/test_a.py', ['-    assert result.exit_code == 0'], '12,1 +11,0');
   assert.deepEqual(ids(kept), ['assertion-removed']);
 });
+
+// --- python assertions weakened to a truthiness check ------------------------
+
+test('a python equality assert replaced by a bare assert is weakened', () => {
+  const diff = mod('tests/test_a.py', ['-    assert total(1) == 3', '+    assert total(1)']);
+  assert.deepEqual(ids(diff), ['assertion-weakened']);
+});
+
+test('a python equality assert replaced by "is not None" is weakened', () => {
+  const diff = mod('tests/test_a.py', ['-    assert total(1) == 3', '+    assert total(1) is not None']);
+  assert.deepEqual(ids(diff), ['assertion-weakened']);
+});
+
+test('a python equality assert replaced by another equality assert is not weakened', () => {
+  const diff = mod('tests/test_a.py', ['-    assert total(1) == 3', '+    assert total(1) == 4']);
+  assert.deepEqual(ids(diff), []);
+});
+
+test('a bare python assert is fine when no precise assert was removed', () => {
+  const diff = mod('tests/test_a.py', ['-    x = 1', '+    assert ready()']);
+  assert.deepEqual(ids(diff), []);
+});
+
+test('reformatting python asserts is not a weakening', () => {
+  const diff = mod('tests/test_a.py', [
+    "-    assert size('Test') == 4",
+    "-    assert is_ok('1.1.1.1')",
+    '+    assert size("Test") == 4',
+    '+    assert is_ok("1.1.1.1")',
+  ]);
+  assert.deepEqual(ids(diff), []);
+  const wrapped = mod('tests/test_a.py', ['-    assert out == 1', '+    assert (', '+        out == 1', '+    )']);
+  assert.deepEqual(ids(wrapped), []);
+});

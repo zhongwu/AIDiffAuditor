@@ -1,0 +1,20 @@
+diff --git a/src/util.ts b/src/util.ts
+index 3a1b2c3..4d5e6f7 100644
+--- a/src/util.ts
++++ b/src/util.ts
+@@ -4,3 +4,3 @@
+-export function fmt(n: number): string {
++export function formatNumber(n: number): string {
+   return n.toFixed(2);
+ }
+diff --git a/src/util.test.ts b/src/util.test.ts
+index 3a1b2c3..4d5e6f7 100644
+--- a/src/util.test.ts
++++ b/src/util.test.ts
+@@ -1,5 +1,5 @@
+-import { fmt } from './util';
++import { formatNumber } from './util';
+ it('formats to two places', () => {
+-  expect(fmt(1)).toBe('1.00');
++  expect(formatNumber(1)).toBe('1.00');
+ });

@@ -1,0 +1,15 @@
+diff --git a/src/api/client.ts b/src/api/client.ts
+index 3a1b2c3..4d5e6f7 100644
+--- a/src/api/client.ts
++++ b/src/api/client.ts
+@@ -20,6 +20,9 @@ export async function load(id: string) {
+-  const data: User = await fetchUser(id);
++  // @ts-ignore
++  const data: User = await fetchUser(id, undefined);
+   try {
+     cache.set(id, data);
+-  } catch (err) {
+-    logger.warn('cache write failed', err);
+-  }
++  } catch (e) {}
+   return data;

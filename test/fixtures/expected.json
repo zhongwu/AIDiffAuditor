@@ -1,0 +1,16 @@
+{
+  "delete-test-file": ["test-file-deleted|high|tests/test_parser.py"],
+  "raise-timeout-lower-coverage": [
+    "coverage-lowered|medium|jest.config.js",
+    "coverage-lowered|medium|jest.config.js",
+    "timeout-inflated|medium|jest.config.js"
+  ],
+  "scoped-suppression": ["suppression-added|low|app/legacy.py"],
+  "silence-type-errors": [
+    "empty-catch|medium|src/api/client.ts",
+    "suppression-added|medium|src/api/client.ts"
+  ],
+  "skip-failing-test": ["test-skipped|high|src/cart.test.ts"],
+  "soften-ci": ["ci-weakened|high|.github/workflows/ci.yml"],
+  "weaken-assertions": ["assertion-weakened|medium|tests/test_prices.py"]
+}
