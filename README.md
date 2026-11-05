@@ -20,6 +20,9 @@ Cursor, Codex...) and needs no API key. Every rule is plain pattern matching, so
 | `empty-catch` | medium | `catch {}`, `except: pass`. Low when it looks deliberate (a named exception type, a comment, `.catch(() => {})`); skipped for cleanup calls like `File.Delete` |
 | `ci-weakened` | medium / high | `continue-on-error: true`, `\|\| true`, `--exit-zero`, a `test` script replaced by `echo` |
 | `ci-test-removed` | medium | A test command removed from a CI pipeline |
+| `coverage-lowered` | medium | A coverage threshold lowered (`fail_under`, `--cov-fail-under`, jest/vitest/nyc `lines` / `branches` ...) |
+| `timeout-inflated` | low / medium | A test timeout at least doubled (10x or more is medium). Looks at test files, test configs and CI |
+| `retries-added` | medium | `jest.retryTimes`, `retries: N`, `@pytest.mark.flaky`, `--reruns`: a flaky test rerun instead of fixed |
 
 Untracked files are audited too, because agents often add new test files.
 

@@ -1,4 +1,4 @@
-import { isCodeFile, isCommentLine, isTestFile } from './patterns';
+import { isCodeFile, isCommentLine, isTestConfigFile, isTestFile } from './patterns';
 import type { DiffLine, FileDiff, Finding, Rule, Severity } from './types';
 
 // ---------------------------------------------------------------------------
@@ -348,6 +348,130 @@ const ciTestRemoved: Rule = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Numeric settings: coverage thresholds and timeouts are compared before and after.
+// ---------------------------------------------------------------------------
+
+/** A number such as 30000, 30_000 or 30 * 1000. */
+const NUM = String.raw`(?<num>\d[\d_]*(?:\.\d+)?)(?:\s*\*\s*(?<mul>\d[\d_]*))?`;
+
+interface NumericSpec {
+  /** Fixed name for the setting; when absent the regex must capture a `key` group. */
+  key?: string;
+  re: RegExp;
+}
+
+interface Reading {
+  key: string;
+  value: number;
+  line: DiffLine;
+}
+
+const COVERAGE_SPECS: NumericSpec[] = [
+  { key: 'fail-under', re: new RegExp(String.raw`fail[_-]under['"]?\s*[=:]?\s*${NUM}`, 'gi') },
+  { re: new RegExp(String.raw`\b(?<key>statements|branches|functions|lines)['"]?\s*:\s*${NUM}`, 'g') },
+  { key: 'target', re: new RegExp(String.raw`\btarget['"]?\s*:\s*['"]?${NUM}`, 'g') },
+];
+
+const TIMEOUT_SPECS: NumericSpec[] = [
+  { key: 'timeout', re: new RegExp(String.raw`\b(?:test|hook)?[Tt]imeout['"]?\s*[:=]\s*${NUM}`, 'g') },
+  { key: 'timeout', re: new RegExp(String.raw`\bsetTimeout\s*\(\s*${NUM}`, 'g') },
+  { key: 'timeout', re: new RegExp(String.raw`\.timeout\s*\(\s*${NUM}`, 'g') },
+  { key: 'timeout', re: new RegExp(String.raw`--(?:test-?)?timeout[= ]\s*${NUM}`, 'g') },
+  { key: 'timeout', re: new RegExp(String.raw`mark\.timeout\s*\(\s*${NUM}`, 'g') },
+  { key: 'timeout-minutes', re: new RegExp(String.raw`timeout-minutes\s*:\s*${NUM}`, 'g') },
+];
+
+function readNumbers(lines: DiffLine[], specs: NumericSpec[]): Reading[] {
+  const out: Reading[] = [];
+  for (const line of lines) {
+    if (isCommentLine(line.text)) {
+      continue;
+    }
+    for (const spec of specs) {
+      for (const m of line.text.matchAll(spec.re)) {
+        const g = m.groups ?? {};
+        const value = Number(g.num.replace(/_/g, '')) * (g.mul ? Number(g.mul.replace(/_/g, '')) : 1);
+        out.push({ key: spec.key ?? g.key, value, line });
+      }
+    }
+  }
+  return out;
+}
+
+/** Pairs each removed setting with the added one of the same name, in order, within one hunk. */
+function changedSettings(file: FileDiff, specs: NumericSpec[]): { before: Reading; after: Reading }[] {
+  const pairs: { before: Reading; after: Reading }[] = [];
+  for (const hunk of file.hunks) {
+    const before = readNumbers(hunk.lines.filter((l) => l.type === 'del'), specs);
+    const after = readNumbers(hunk.lines.filter((l) => l.type === 'add'), specs);
+    const used = new Set<Reading>();
+    for (const b of before) {
+      const a = after.find((r) => r.key === b.key && !used.has(r));
+      if (a) {
+        used.add(a);
+        pairs.push({ before: b, after: a });
+      }
+    }
+  }
+  return pairs;
+}
+
+const isCiFile = (path: string): boolean => CI_YAML_RE.test(path);
+
+const coverageLowered: Rule = {
+  id: 'coverage-lowered',
+  description: 'A coverage threshold was lowered, so the build passes with less of the code tested.',
+  run(file) {
+    if (!isTestConfigFile(file.path) && !isCiFile(file.path)) {
+      return [];
+    }
+    return changedSettings(file, COVERAGE_SPECS)
+      .filter(({ before, after }) => after.value < before.value)
+      .map(({ before, after }) =>
+        at(this.id, 'medium', file, after.line, `Coverage threshold lowered from ${before.value} to ${after.value}`),
+      );
+  },
+};
+
+const timeoutInflated: Rule = {
+  id: 'timeout-inflated',
+  description: 'A test timeout was raised a lot, which can hide a test that became slow or hangs.',
+  run(file) {
+    if (!isTestFile(file.path) && !isTestConfigFile(file.path) && !isCiFile(file.path)) {
+      return [];
+    }
+    return changedSettings(file, TIMEOUT_SPECS)
+      .filter(({ before, after }) => before.value > 0 && after.value >= before.value * 2)
+      .map(({ before, after }) =>
+        at(
+          this.id,
+          after.value >= before.value * 10 ? 'medium' : 'low',
+          file,
+          after.line,
+          `Timeout raised from ${before.value} to ${after.value}`,
+        ),
+      );
+  },
+};
+
+/** Retrying a failing test until it passes instead of fixing it. */
+const RETRY_RE =
+  /\bjest\.retryTimes\s*\(|\bretries['"]?\s*[:=]\s*[1-9]|\.retries\s*\(\s*[1-9]|@pytest\.mark\.flaky\b|@flaky\b|--reruns?\b|--retries[= ]\s*[1-9]|\brerunfailures\b|\bretryTimes\s*[:=]\s*[1-9]/;
+
+const retriesAdded: Rule = {
+  id: 'retries-added',
+  description: 'Test retries were added, so a flaky test is rerun instead of fixed.',
+  run(file) {
+    if (!isTestFile(file.path) && !isTestConfigFile(file.path) && !isCiFile(file.path)) {
+      return [];
+    }
+    return added(file)
+      .filter((l) => !isCommentLine(l.text) && RETRY_RE.test(l.text))
+      .map((l) => at(this.id, 'medium', file, l, 'Retries added: a flaky test is rerun instead of fixed'));
+  },
+};
+
 export const RULES: Rule[] = [
   testFileDeleted,
   testSkipped,
@@ -360,4 +484,7 @@ export const RULES: Rule[] = [
   emptyCatch,
   ciWeakened,
   ciTestRemoved,
+  coverageLowered,
+  timeoutInflated,
+  retriesAdded,
 ];

@@ -200,3 +200,62 @@ test('deliberate-looking empty catches are low severity, bare ones stay medium',
   assert.deepEqual(sevs(mod('src/A.cs', ['+  catch (Exception) { }'])), ['empty-catch:medium']);
   assert.deepEqual(sevs(mod('src/a.py', ['+except:', '+    pass'])), ['empty-catch:medium']);
 });
+
+// --- coverage thresholds, timeouts and retries -------------------------------
+
+const only = (diff: string, rule: string) => auditDiff(diff).filter((f) => f.ruleId === rule);
+
+test('flags a lowered coverage threshold', () => {
+  const jest = mod('jest.config.js', ['-    lines: 80,', '+    lines: 60,']);
+  assert.equal(only(jest, 'coverage-lowered').length, 1);
+  assert.match(only(jest, 'coverage-lowered')[0].message, /from 80 to 60/);
+  assert.equal(only(mod('pyproject.toml', ['-fail_under = 90', '+fail_under = 70']), 'coverage-lowered').length, 1);
+  assert.equal(only(mod('Makefile', ['-\tpytest --cov-fail-under=85', '+\tpytest --cov-fail-under=50']), 'coverage-lowered').length, 1);
+  assert.equal(only(mod('package.json', ['-      "branches": 75', '+      "branches": 40']), 'coverage-lowered').length, 1);
+});
+
+test('does not flag a raised threshold, an unrelated number, or a non-config file', () => {
+  assert.deepEqual(only(mod('jest.config.js', ['-    lines: 60,', '+    lines: 80,']), 'coverage-lowered'), []);
+  assert.deepEqual(only(mod('jest.config.js', ['-    lines: 80,', '+    lines: 80,', '+    verbose: true']), 'coverage-lowered'), []);
+  assert.deepEqual(only(mod('src/table.ts', ['-  lines: 80,', '+  lines: 20,']), 'coverage-lowered'), []);
+  // Only one side of the change is present, so there is nothing to compare.
+  assert.deepEqual(only(mod('jest.config.js', ['+    lines: 10,']), 'coverage-lowered'), []);
+});
+
+test('flags a test timeout that was raised a lot', () => {
+  const small = only(mod('src/a.test.ts', ["-it('slow', async () => {}, { timeout: 5000 });", "+it('slow', async () => {}, { timeout: 20000 });"]), 'timeout-inflated');
+  assert.deepEqual(small.map((f) => f.severity), ['low']);
+  const big = only(mod('vitest.config.ts', ['-    testTimeout: 5_000,', '+    testTimeout: 120_000,']), 'timeout-inflated');
+  assert.deepEqual(big.map((f) => f.severity), ['medium']);
+  assert.equal(only(mod('jest.config.js', ['-  testTimeout: 5000,', '+  testTimeout: 60 * 1000,']), 'timeout-inflated').length, 1);
+  assert.equal(only(mod('.github/workflows/ci.yml', ['-    timeout-minutes: 10', '+    timeout-minutes: 60']), 'timeout-inflated').length, 1);
+  assert.equal(only(mod('tests/test_a.py', ['-@pytest.mark.timeout(5)', '+@pytest.mark.timeout(60)']), 'timeout-inflated').length, 1);
+});
+
+test('does not flag small timeout changes, lowered timeouts, or timeouts outside tests', () => {
+  assert.deepEqual(only(mod('src/a.test.ts', ['-  { timeout: 5000 }', '+  { timeout: 8000 }']), 'timeout-inflated'), []);
+  assert.deepEqual(only(mod('src/a.test.ts', ['-  { timeout: 5000 }', '+  { timeout: 1000 }']), 'timeout-inflated'), []);
+  assert.deepEqual(only(mod('src/client.ts', ['-  timeout: 1000,', '+  timeout: 30000,']), 'timeout-inflated'), []);
+});
+
+test('flags retries added to tests', () => {
+  assert.equal(only(mod('src/a.test.ts', ['+jest.retryTimes(3);']), 'retries-added').length, 1);
+  assert.equal(only(mod('cypress.config.ts', ['+  retries: 2,']), 'retries-added').length, 1);
+  assert.equal(only(mod('tests/test_a.py', ['+@pytest.mark.flaky(reruns=3)']), 'retries-added').length, 1);
+  assert.equal(only(mod('Makefile', ['+\tpytest --reruns 3']), 'retries-added').length, 1);
+  assert.equal(only(mod('.mocharc.json', ['+  "retries": 2']), 'retries-added').length, 1);
+});
+
+test('does not flag zero retries, retry logic in app code, or a comment', () => {
+  assert.deepEqual(only(mod('cypress.config.ts', ['+  retries: 0,']), 'retries-added'), []);
+  assert.deepEqual(only(mod('src/http.ts', ['+  retries: 3,']), 'retries-added'), []);
+  assert.deepEqual(only(mod('src/a.test.ts', ['+// jest.retryTimes(3) would hide the flake']), 'retries-added'), []);
+});
+
+test('catches a mocha timeout raised in a VS Code extension test config (seen in a real repo)', () => {
+  const found = only(
+    mod('.vscode-test.mjs', ["-  mocha: { ui: 'tdd', timeout: 20000 },", "+  mocha: { ui: 'tdd', timeout: 60000 },"]),
+    'timeout-inflated',
+  );
+  assert.deepEqual(found.map((f) => [f.severity, f.message]), [['low', 'Timeout raised from 20000 to 60000']]);
+});

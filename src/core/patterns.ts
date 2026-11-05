@@ -16,6 +16,21 @@ export function isTestFile(path: string): boolean {
   return TEST_PATH_PATTERNS.some((re) => re.test(path));
 }
 
+/** Config files that control how tests run or how coverage is enforced. */
+const TEST_CONFIG_PATTERNS: RegExp[] = [
+  /(?:^|\/)(?:jest|vitest|vitest\.workspace|playwright|cypress|karma\.conf|babel|nyc|c8|stryker)\.config\.[cm]?[jt]s$/i,
+  /(?:^|\/)(?:jest|vitest|playwright|cypress)\.config\.json$/i,
+  /(?:^|\/)\.(?:mocharc|nycrc|c8rc|coveragerc)(?:\.[\w]+)?$/,
+  /(?:^|\/)\.vscode-test\.[cm]?[jt]s$/,
+  /(?:^|\/)(?:pytest\.ini|tox\.ini|setup\.cfg|pyproject\.toml|package\.json|Makefile|justfile)$/,
+  /(?:^|\/)\.?codecov\.ya?ml$/i,
+  /(?:^|\/)(?:Cargo\.toml|build\.gradle(?:\.kts)?|pom\.xml)$/,
+];
+
+export function isTestConfigFile(path: string): boolean {
+  return TEST_CONFIG_PATTERNS.some((re) => re.test(path));
+}
+
 export function isCodeFile(path: string): boolean {
   return CODE_EXT.test(path);
 }

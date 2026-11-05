@@ -35,7 +35,7 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [ ] Still to measure: a larger or different mix of repos (Python, Go, Java), and diffs from real agent sessions rather than human history.
 - [ ] Known false alarm: regex/pattern tables in linting tools (this repo's own `rules.ts`) look like suppressions.
 - [ ] Keep every rule at one positive and one negative test minimum; no rule id renames.
-- [ ] Add rules: coverage-threshold lowered, timeout inflation, retries added to flaky tests.
+- [x] New rules: `coverage-lowered`, `timeout-inflated`, `retries-added` (before/after comparison of numbers, restricted to test files, test configs and CI). 0 false alarms on 203 real commits; caught 1 real timeout bump (20s to 60s).
 - [ ] Widen language coverage: Python (pytest/unittest), Go, Java/Kotlin (JUnit), Rust, C#, Ruby.
 
 ## Phase 3: Workflow features
