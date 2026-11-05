@@ -32,6 +32,12 @@ Untracked files are audited too, because agents often add new test files.
 the *Diff Auditor* view in the Explorer, in the Problems panel and in the status bar. Click one to
 jump to the line.
 
+
+**Hiding findings you have accepted.** *Set Baseline (Hide Current Findings)* hides everything that exists now, so only
+what an agent adds later is reported. To accept a single finding, click the check mark next to it in the view, or use the
+**Diff Auditor: mark as reviewed** quick fix (lightbulb) on the line. Reviewed findings stay hidden when their line
+moves, but a second copy of the same shortcut is reported. They are stored in `.git/diffaudit-baseline.json`, which is
+never committed, and *Clear Baseline* brings everything back. The CLI and the Claude Code hooks use the same file.
 **By the agent itself:** the extension registers a language model tool, `#auditChanges`. In Copilot
 agent mode you can tell the agent to run it before it says it is done.
 

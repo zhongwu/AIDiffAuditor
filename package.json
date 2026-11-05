@@ -47,6 +47,11 @@
       {
         "command": "diffAuditor.clearBaseline",
         "title": "Diff Auditor: Clear Baseline (Show All Findings)"
+      },
+      {
+        "command": "diffAuditor.markReviewed",
+        "title": "Diff Auditor: Mark Finding as Reviewed",
+        "icon": "$(check)"
       }
     ],
     "views": {
@@ -74,6 +79,18 @@
           "command": "diffAuditor.clearBaseline",
           "when": "view == diffAuditor.findings",
           "group": "baseline@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "diffAuditor.markReviewed",
+          "when": "view == diffAuditor.findings && viewItem == finding",
+          "group": "inline"
+        },
+        {
+          "command": "diffAuditor.markReviewed",
+          "when": "view == diffAuditor.findings && viewItem == finding",
+          "group": "review@1"
         }
       ]
     },

@@ -46,3 +46,17 @@ export function newSinceBaseline(findings: Finding[], baseline: Baseline): Findi
     return true;
   });
 }
+
+/**
+ * Marks findings as reviewed by adding them to a baseline (a new, empty one if none exists yet).
+ * They stay hidden even when their line moves; a second copy of the same shortcut is still reported.
+ */
+export function addToBaseline(baseline: Baseline | undefined, reviewed: Finding[], now: Date = new Date()): Baseline {
+  const base = baseline ?? createBaseline([], now);
+  const counts = { ...base.counts };
+  for (const f of reviewed) {
+    const key = findingKey(f);
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return { ...base, counts };
+}

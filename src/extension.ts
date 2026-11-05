@@ -3,7 +3,7 @@ import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
 import { auditDiff } from './core/audit';
-import { createBaseline, newSinceBaseline, parseBaseline } from './core/baseline';
+import { addToBaseline, createBaseline, newSinceBaseline, parseBaseline } from './core/baseline';
 import { countBySeverity, formatFindings } from './core/format';
 import { SEVERITY_RANK } from './core/types';
 import type { Finding, Severity } from './core/types';
@@ -18,6 +18,10 @@ class FindingsProvider implements vscode.TreeDataProvider<LocatedFinding> {
   readonly onDidChangeTreeData = this.emitter.event;
   private items: LocatedFinding[] = [];
 
+  current(): LocatedFinding[] {
+    return this.items;
+  }
+
   set(items: LocatedFinding[]): void {
     this.items = items;
     this.emitter.fire();
@@ -27,6 +31,7 @@ class FindingsProvider implements vscode.TreeDataProvider<LocatedFinding> {
     const item = new vscode.TreeItem(f.message, vscode.TreeItemCollapsibleState.None);
     item.description = f.ruleId === 'test-file-deleted' ? `${f.file} (deleted)` : `${f.file}:${f.line}`;
     item.tooltip = f.snippet ? `${f.ruleId}\n${f.snippet}` : f.ruleId;
+    item.contextValue = 'finding';
     item.iconPath = new vscode.ThemeIcon(
       f.severity === 'high' ? 'error' : f.severity === 'medium' ? 'warning' : 'info',
     );
@@ -183,6 +188,52 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.window.showErrorMessage(`Diff Auditor: ${err instanceof Error ? err.message : String(err)}`);
       }
     }),
+    vscode.commands.registerCommand('diffAuditor.markReviewed', async (target?: { uri: vscode.Uri | string; line: number; ruleId: string }) => {
+      try {
+        let finding = target
+          ? provider.current().find((f) => f.uri.toString() === target.uri.toString() && f.line === target.line && f.ruleId === target.ruleId)
+          : undefined;
+        if (!finding && !target) {
+          const pick = await vscode.window.showQuickPick(
+            provider.current().map((f) => ({ label: f.message, description: `${f.file}:${f.line}`, f })),
+            { placeHolder: 'Mark which finding as reviewed?' },
+          );
+          finding = pick?.f;
+        }
+        if (!finding) {
+          return;
+        }
+        const file = await baselinePath(pickFolder().uri.fsPath);
+        const existing = existsSync(file) ? parseBaseline(await readFile(file, 'utf8')) : undefined;
+        const { uri: _uri, ...plain } = finding;
+        await writeFile(file, JSON.stringify(addToBaseline(existing, [plain]), null, 2));
+        await auditAndShow(false);
+      } catch (err) {
+        void vscode.window.showErrorMessage(`Diff Auditor: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }),
+    vscode.languages.registerCodeActionsProvider(
+      { scheme: 'file' },
+      {
+        provideCodeActions(document, _range, ctx) {
+          return ctx.diagnostics
+            .filter((d) => d.source === 'Diff Auditor')
+            .flatMap((d) => {
+              const match = provider
+                .current()
+                .find((f) => f.uri.toString() === document.uri.toString() && f.line - 1 === d.range.start.line && f.ruleId === d.code);
+              if (!match) {
+                return [];
+              }
+              const action = new vscode.CodeAction('Diff Auditor: mark as reviewed', vscode.CodeActionKind.QuickFix);
+              action.diagnostics = [d];
+              action.command = { command: 'diffAuditor.markReviewed', title: 'Mark as reviewed', arguments: [{ uri: match.uri.toString(), line: match.line, ruleId: match.ruleId }] };
+              return [action];
+            });
+        },
+      },
+      { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] },
+    ),
     vscode.commands.registerCommand('diffAuditor.clearBaseline', async () => {
       try {
         await rm(await baselinePath(pickFolder().uri.fsPath), { force: true });

@@ -46,7 +46,7 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [ ] Widen language coverage: Python (pytest/unittest), Go, Java/Kotlin (JUnit), Rust, C#, Ruby.
 
 ## Phase 3: Workflow features
-- [ ] "Mark reviewed" for individual findings (accept one without baselining everything). The session baseline already covers the "ignore everything that exists now" case.
+- [x] "Mark reviewed" for individual findings: check button in the view, a "mark as reviewed" quick fix, and a palette command. It adds the finding to the shared baseline file (`addToBaseline`), so the CLI and hooks honour it too. Integration test covers the quick fix. Note: *Set Baseline* overwrites earlier marks, but it re-captures every current finding anyway.
 - [ ] Shared team config file (committed, e.g. `.diffauditor.json`) read by both extension and CLI.
 - [ ] Baseline / compare against a chosen ref (branch or commit), not just working tree.
 - [ ] CLI polish: JSON and SARIF output, docs for pre-commit hook and CI use.

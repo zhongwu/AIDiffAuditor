@@ -59,6 +59,26 @@ export async function run(): Promise<void> {
     assert.match(text, /a\.test\.js/);
   });
 
+  await check('quick fix marks one finding as reviewed and leaves the others', async () => {
+    await vscode.commands.executeCommand('diffAuditor.audit');
+    const target = vscode.languages.getDiagnostics().find(([uri]) => uri.fsPath.endsWith('app.ts'));
+    assert.ok(target, 'no diagnostics on app.ts');
+    const diag = target[1].filter((d) => d.source === 'Diff Auditor')[0];
+    const before = diagnosticsFor('app.ts').length;
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(target[0]));
+    const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+      'vscode.executeCodeActionProvider',
+      target[0],
+      new vscode.Selection(diag.range.start, diag.range.start),
+    );
+    const action = actions.find((a) => a.title.includes('mark as reviewed'));
+    assert.ok(action?.command, 'no mark-as-reviewed quick fix offered');
+    await vscode.commands.executeCommand(action.command.command, ...(action.command.arguments ?? []));
+    assert.equal(diagnosticsFor('app.ts').length, before - 1, 'reviewed finding should disappear');
+    assert.ok(diagnosticsFor('a.test.js').length > 0, 'other findings must stay');
+    await vscode.commands.executeCommand('diffAuditor.clearBaseline');
+  });
+
   await check('baseline hides existing findings and reports only new ones', async () => {
     await vscode.commands.executeCommand('diffAuditor.setBaseline');
     assert.equal(diagnosticsFor('a.test.js').length, 0, 'old finding still shown after setBaseline');

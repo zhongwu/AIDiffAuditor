@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { auditDiff } from '../src/core/audit';
 import { formatFindings } from '../src/core/format';
-import { createBaseline, newSinceBaseline, parseBaseline } from '../src/core/baseline';
+import { addToBaseline, createBaseline, newSinceBaseline, parseBaseline } from '../src/core/baseline';
 import { mod } from './helpers';
 
 const skipped = (line: string): string =>
@@ -49,4 +49,26 @@ test('the report says how many findings the baseline hid', () => {
   assert.match(formatFindings(findings, 50, 3), /3 existing finding\(s\) hidden by the saved baseline/);
   assert.match(formatFindings([], 50, 2), /no suspicious changes found.*2 existing/s);
   assert.doesNotMatch(formatFindings(findings), /hidden/);
+});
+
+test('marking one finding reviewed hides only that finding', () => {
+  const diff =
+    skipped("it.skip('works', () => {});") + mod('b.test.js', ['-x', "+  xit('b', () => {});"]);
+  const findings = auditDiff(diff);
+  assert.equal(findings.length, 2);
+  const reviewed = addToBaseline(undefined, [findings[0]]);
+  assert.deepEqual(newSinceBaseline(findings, reviewed).map((f) => f.file), [findings[1].file]);
+});
+
+test('marking reviewed keeps what the baseline already hid', () => {
+  const findings = auditDiff(skipped("it.skip('works', () => {});"));
+  const other = auditDiff(mod('b.test.js', ['-x', "+  xit('b', () => {});"]));
+  const merged = addToBaseline(createBaseline(findings), other);
+  assert.deepEqual(newSinceBaseline([...findings, ...other], merged), []);
+});
+
+test('a reviewed finding does not hide a second copy of the same shortcut', () => {
+  const findings = auditDiff(skipped("it.skip('works', () => {});"));
+  const reviewed = addToBaseline(undefined, findings);
+  assert.equal(newSinceBaseline([...findings, ...findings], reviewed).length, 1);
 });
