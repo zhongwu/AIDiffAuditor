@@ -10,11 +10,19 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [x] Decide whether CLAUDE.md / SESSION-NOTES.md / BRAINSTORM.md stay local-only (staying local in .gitignore).
 
 ## Phase 1: Verify the UI (blocker for everything else)
-- [ ] Press F5 and run in an Extension Development Host against a scratch git repo.
-- [ ] Walk through: audit command, tree view, diagnostics (squiggles), status bar, settings
-      (`diffAuditor.ignoreRules`, fail-on severity).
-- [ ] Check edge cases: no git repo, no changes, untracked files, binary files, large diffs, multi-root workspaces.
-- [ ] Verify the `diffAuditor_auditChanges` language model tool is callable from Copilot agent mode / Claude Code.
+- [x] Automated Extension Host run (`npm run test:integration`, VS Code 1.145 against a scratch repo): activation, commands, diagnostics, `ignoreRules`, clear.
+- [x] Manual F5 pass (`.sandbox/`, `npm run sandbox`): tree view, status bar, badges, squiggles, click-to-open confirmed.
+- [x] Manual F5 also confirmed: tooltip text, `minSeverity`, `ignoreRules`, `autoAudit`, findings clear when the code is fixed.
+- [x] Manual F5: clean state ("No suspicious changes found", status "clean") confirmed after fixing all findings.
+- [ ] Open: tree icon vs squiggle severity mismatch (decide: keep or align); Clear command panel/status reset checked only by the automated test.
+- [x] Edge cases in `test/git.test.ts`: no git repo, no commits (fixed), no changes, untracked files, subfolder cwd, binary files, bad base ref.
+- [ ] Edge cases still open: very large diffs, multi-root workspaces, `baseRef` setting.
+- [x] `diffAuditor_auditChanges` registered and invocable via `vscode.lm.invokeTool`.
+- [x] Claude Code: Stop hook (`scripts/claude-stop-hook.js`, wired by `npm run sandbox`) fires and the agent receives the findings.
+- [x] Copilot agent mode (gpt-oss:120b-cloud) called `diffAuditor_auditChanges` on request and reported 2 high / 3 medium correctly.
+- [ ] Copilot: does it call the tool unprompted before finishing a task? (try with and without `.github/copilot-instructions.md`)
+- [ ] Gap found: the audit reports every uncommitted change, so an agent cannot tell its own changes from pre-existing ones.
+      Add a session baseline (snapshot at start, report only new findings); fold into Phase 3 "mark reviewed".
 - [ ] Fix what breaks; add tests for anything fixable in `src/core`.
 
 ## Phase 2: Rule quality

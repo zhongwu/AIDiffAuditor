@@ -27,6 +27,17 @@ async function git(args: string[], cwd: string, okExitCodes: number[] = [0]): Pr
   }
 }
 
+const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+
+async function hasCommits(root: string): Promise<boolean> {
+  try {
+    await git(['rev-parse', '--verify', '--quiet', 'HEAD'], root);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface DiffRequest {
   /** Any directory inside the repository. */
   cwd: string;
@@ -44,7 +55,11 @@ export interface CollectedDiff {
 
 export async function collectDiff(req: DiffRequest): Promise<CollectedDiff> {
   const root = (await git(['rev-parse', '--show-toplevel'], req.cwd)).trim();
-  const base = req.baseRef?.trim() || 'HEAD';
+  let base = req.baseRef?.trim() || 'HEAD';
+  if (base === 'HEAD' && !(await hasCommits(root))) {
+    // A fresh repository has no HEAD yet; compare against the empty tree so staged files still show up.
+    base = EMPTY_TREE;
+  }
 
   let diff = await git(['diff', ...DIFF_FLAGS, base, '--'], root);
 

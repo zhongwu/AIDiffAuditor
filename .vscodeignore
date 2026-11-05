@@ -11,3 +11,8 @@ BRAINSTORM.md
 CLAUDE.md
 SESSION-NOTES.md
 DEVELOPMENT-PLAN.md
+integration/**
+out/integration/**
+scripts/**
+.sandbox/**
+.vscode-test/**

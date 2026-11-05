@@ -125,11 +125,14 @@
     "compile": "tsc -p .",
     "watch": "tsc -watch -p .",
     "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
-    "vscode:prepublish": "npm run compile"
+    "vscode:prepublish": "npm run compile",
+    "test:integration": "npm run compile && node out/integration/runTest.js",
+    "sandbox": "node scripts/make-sandbox.js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/vscode": "1.100.0",
+    "@vscode/test-electron": "^3.1.0",
     "typescript": "^5.6.0"
   }
 }
