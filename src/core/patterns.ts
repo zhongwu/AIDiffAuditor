@@ -10,7 +10,7 @@ const TEST_PATH_PATTERNS: RegExp[] = [
 const CODE_EXT = /\.(?:[cm]?[jt]sx?|vue|svelte|py|go|rs|java|kt|kts|scala|cs|rb|php|swift|c|cc|cpp|h|hpp|m|mm|dart|ex|exs)$/i;
 
 /** Paths the audit never looks at: dependencies, build output, lockfiles, snapshots. */
-const IGNORED_PATH = /(?:^|\/)(?:node_modules|dist|build|out|vendor|\.git)\/|\.(?:lock|snap|min\.js|map)$|(?:^|\/)(?:package-lock\.json|pnpm-lock\.yaml)$/;
+const IGNORED_PATH = /(?:^|\/)(?:node_modules|dist|build|out|vendor|\.git)\/|\.(?:lock|snap|min\.js|map|patch|diff)$|(?:^|\/)(?:package-lock\.json|pnpm-lock\.yaml)$/;
 
 export function isTestFile(path: string): boolean {
   return TEST_PATH_PATTERNS.some((re) => re.test(path));

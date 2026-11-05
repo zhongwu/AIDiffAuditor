@@ -180,17 +180,61 @@ function insideString(text: string, index: number): boolean {
       }
     } else if (c === '"' || c === "'" || c === '`') {
       quote = c;
-    } else if ((c === '/' && text[i + 1] === '/') || c === '#') {
+    } else if ((c === '/' && text[i + 1] === '/') || (c === '#' && (i + 1 >= text.length || /\s/.test(text[i + 1])))) {
       return false;
     }
   }
   return quote !== '';
 }
 
-/** Like re.test(text), but ignores a match that sits inside a string literal. */
+/**
+ * True when `index` sits inside a regex literal such as `/@ts-ignore\b/`. A rule table that talks
+ * about a pattern is not the pattern. A `/` starts a regex only after `= : ( , [ ! & | ? { ;`,
+ * `return` or the start of the line, which keeps division and `//` comments out.
+ */
+function insideRegexLiteral(text: string, index: number): boolean {
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"' || c === "'" || c === '`') {
+      for (i++; i < text.length && text[i] !== c; i++) {
+        if (text[i] === '\\') {
+          i++;
+        }
+      }
+    } else if (c === '/' && text[i + 1] !== '/' && text[i + 1] !== '*') {
+      const before = text.slice(0, i).trimEnd();
+      if (before !== '' && !/(?:[=:(,[!&|?{;]|\breturn)$/.test(before)) {
+        continue;
+      }
+      let inClass = false;
+      let j = i + 1;
+      for (; j < text.length; j++) {
+        if (text[j] === '\\') {
+          j++;
+        } else if (text[j] === '[') {
+          inClass = true;
+        } else if (text[j] === ']') {
+          inClass = false;
+        } else if (text[j] === '/' && !inClass) {
+          break;
+        }
+      }
+      if (j >= text.length) {
+        return false;
+      }
+      if (index > i && index < j) {
+        return true;
+      }
+      i = j;
+    }
+  }
+  return false;
+}
+
+/** Like re.test(text), but ignores a match inside a string literal or a regex literal. */
 function hits(re: RegExp, text: string): boolean {
   const m = re.exec(text);
-  return m !== null && !insideString(text, m.index);
+  return m !== null && !insideString(text, m.index) && !insideRegexLiteral(text, m.index);
 }
 
 // ---------------------------------------------------------------------------
@@ -257,7 +301,7 @@ const testFocused: Rule = {
       return [];
     }
     return added(file)
-      .filter((l) => !isCommentLine(l.text) && FOCUS_RE.test(l.text))
+      .filter((l) => !isCommentLine(l.text) && hits(FOCUS_RE, l.text))
       .map((l) => at(this.id, 'medium', file, l, 'Focused test (.only / fit) hides the rest of the suite'));
   },
 };
@@ -280,12 +324,22 @@ const testRemoved: Rule = {
   },
 };
 
+/** Test frameworks' way of running one test body over a table of cases. */
+const PARAMETRIZED_RE =
+  /@pytest\.mark\.parametrize\b|@ParameterizedTest\b|\b(?:it|test|describe)\.each\b|\bt\.Run\s*\(|@DataProvider\b|@dataProvider\b|\[Theory\]/;
+
+/** Folding several asserts into one parametrized test removes asserts without losing any check. */
+const addsParametrization = (file: FileDiff): boolean => added(file).some((l) => PARAMETRIZED_RE.test(l.text));
+
 const assertionRemoved: Rule = {
   id: 'assertion-removed',
   description: 'More assertions were removed from a test file than were added.',
   run(file) {
     if (!isTestFile(file.path) || file.status === 'deleted') {
       return [];
+    }
+    if (addsParametrization(file)) {
+      return []; // several asserts folded into one parametrized test
     }
     // Assertions that disappeared together with their whole test are already reported by
     // test-removed; this rule is about assertions taken out of tests that stay.
@@ -308,6 +362,9 @@ const assertionWeakened: Rule = {
   run(file) {
     if (!isTestFile(file.path) || file.status === 'deleted') {
       return [];
+    }
+    if (addsParametrization(file)) {
+      return []; // several asserts folded into one parametrized test
     }
     const out: Finding[] = [];
     for (const hunk of file.hunks) {
@@ -387,7 +444,7 @@ const emptyCatch: Rule = {
         if (l.type !== 'add' || isCommentLine(l.text)) {
           continue;
         }
-        if (EMPTY_CATCH_ONE_LINE.some((re) => re.test(l.text))) {
+        if (EMPTY_CATCH_ONE_LINE.some((re) => hits(re, l.text))) {
           const severity = emptyCatchSeverity(l.text);
           if (severity) {
             out.push(at(this.id, severity, file, l, message));
@@ -558,6 +615,9 @@ const timeoutInflated: Rule = {
 const RETRY_RE =
   /\bjest\.retryTimes\s*\(|\bretries['"]?\s*[:=]\s*[1-9]|\.retries\s*\(\s*[1-9]|@pytest\.mark\.flaky\b|@flaky\b|--reruns?\b|--retries[= ]\s*[1-9]|\brerunfailures\b|\bretryTimes\s*[:=]\s*[1-9]/;
 
+/** `"retries": 2` as a JSON key starts inside quotes, which the string guard would otherwise hide. */
+const JSON_RETRIES_RE = /^\s*["']retries["']\s*:\s*[1-9]/;
+
 const retriesAdded: Rule = {
   id: 'retries-added',
   description: 'Test retries were added, so a flaky test is rerun instead of fixed.',
@@ -566,7 +626,7 @@ const retriesAdded: Rule = {
       return [];
     }
     return added(file)
-      .filter((l) => !isCommentLine(l.text) && RETRY_RE.test(l.text))
+      .filter((l) => !isCommentLine(l.text) && (hits(RETRY_RE, l.text) || JSON_RETRIES_RE.test(l.text)))
       .map((l) => at(this.id, 'medium', file, l, 'Retries added: a flaky test is rerun instead of fixed'));
   },
 };

@@ -417,3 +417,51 @@ test('a Kotlin catch of one named exception type is low', () => {
   assert.deepEqual(severities(added('src/Socket.kt', ['    try { doWork() } catch (_: IOException) {}'])), ['empty-catch:low']);
   assert.deepEqual(severities(added('src/Socket.kt', ['    try { doWork() } catch (e: Exception) {}'])), ['empty-catch:medium']);
 });
+
+// --- a tool that talks about patterns is not using them ------------------------
+
+test('a suppression pattern inside a regex literal is not a suppression', () => {
+  const table = added('src/rules.ts', ["  { re: /@ts-ignore\b/, label: 'type error', severity: 'medium' },"]);
+  assert.deepEqual(ids(table), []);
+  const assign = added('src/rules.ts', ['const RE = /eslint-disable-next-line/;']);
+  assert.deepEqual(ids(assign), []);
+});
+
+test('a real suppression comment after a division or a url is still found', () => {
+  assert.deepEqual(ids(added('src/a.ts', ['const half = total / 2; // @ts-ignore'])), ['suppression-added']);
+  assert.deepEqual(ids(added('src/a.ts', ['// @ts-ignore'])), ['suppression-added']);
+});
+
+test('it.only, retries and an empty catch inside a string are not findings', () => {
+  assert.deepEqual(ids(added('test/a.test.ts', ["const s = '  it.only(\"x\", () => {})';"])), []);
+  assert.deepEqual(ids(added('test/a.test.ts', ["const t = 'try { f() } catch (e) {}';"])), []);
+  assert.deepEqual(ids(added('jest.config.js', ["  note: 'retries: 2',"])), []);
+});
+
+test('a quoted json retries key is still found, and .patch files are not audited', () => {
+  assert.deepEqual(ids(added('cypress.config.json', ['  "retries": 2,'])), ['retries-added']);
+  assert.deepEqual(ids(added('test/fixtures/skip.patch', ['+  it.skip("x", () => {});'])), []);
+});
+
+test('folding several asserts into one parametrized test is not a removal', () => {
+  const folded =
+    `diff --git a/tests/test_a.py b/tests/test_a.py\n--- a/tests/test_a.py\n+++ b/tests/test_a.py\n` +
+    [
+      '@@ -43 +43,3 @@',
+      '-def test_one():',
+      '+@pytest.mark.parametrize(("a", "b"), [(1, 2), (3, 4)])',
+      '+def test_one(a, b):',
+      '+    assert f(a) == b',
+      '@@ -59,3 +60,0 @@',
+      '-    assert f(5) == 6',
+      '-    assert f(7) == 8',
+      '-    assert f(9) == 10',
+    ].join('\n') +
+    '\n';
+  assert.deepEqual(ids(folded), []);
+});
+
+test('removing asserts without any parametrization is still reported', () => {
+  const removed = mod('tests/test_a.py', ['-    assert f(5) == 6', '-    assert f(7) == 8', '+    pass']);
+  assert.deepEqual(ids(removed), ['assertion-removed']);
+});
