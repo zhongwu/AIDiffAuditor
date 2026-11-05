@@ -1,10 +1,14 @@
 // Creates .sandbox/: a throwaway git repo with typical "agent shortcut" edits, for manual F5 testing.
 const { execFileSync } = require('node:child_process');
-const { mkdirSync, rmSync, writeFileSync } = require('node:fs');
+const { mkdirSync, readdirSync, rmSync, writeFileSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 
 const dir = resolve(__dirname, '..', '.sandbox');
-rmSync(dir, { recursive: true, force: true });
+// Empty the folder rather than deleting it: Windows refuses to remove a folder that a VS Code window has open.
+mkdirSync(dir, { recursive: true });
+for (const name of readdirSync(dir)) {
+  rmSync(join(dir, name), { recursive: true, force: true, maxRetries: 3 });
+}
 mkdirSync(join(dir, '.github', 'workflows'), { recursive: true });
 const git = (...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, stdio: 'ignore' });
 
@@ -26,6 +30,12 @@ writeFileSync(join(dir, '.github', 'workflows', 'ci.yml'), 'steps:\n  - run: npm
 writeFileSync(join(dir, 'new.test.js'), test.replace("it('adds'", "xit('adds'"));
 // Claude Code hook: audit when Claude tries to finish.
 mkdirSync(join(dir, '.claude'), { recursive: true });
-const hook = 'node "' + join(__dirname, 'claude-stop-hook.js').split('\\').join('/') + '"';
-writeFileSync(join(dir, '.claude', 'settings.json'), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: hook }] }] } }, null, 2));
+const hookCmd = (name) => 'node "' + join(__dirname, name).split('\\').join('/') + '"';
+const settings = {
+  hooks: {
+    SessionStart: [{ hooks: [{ type: 'command', command: hookCmd('claude-session-start-hook.js') }] }],
+    Stop: [{ hooks: [{ type: 'command', command: hookCmd('claude-stop-hook.js') }] }],
+  },
+};
+writeFileSync(join(dir, '.claude', 'settings.json'), JSON.stringify(settings, null, 2));
 console.log('Sandbox ready:', dir);

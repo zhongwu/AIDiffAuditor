@@ -21,8 +21,10 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [x] Claude Code: Stop hook (`scripts/claude-stop-hook.js`, wired by `npm run sandbox`) fires and the agent receives the findings.
 - [x] Copilot agent mode (gpt-oss:120b-cloud) called `diffAuditor_auditChanges` on request and reported 2 high / 3 medium correctly.
 - [ ] Copilot: does it call the tool unprompted before finishing a task? (try with and without `.github/copilot-instructions.md`)
-- [ ] Gap found: the audit reports every uncommitted change, so an agent cannot tell its own changes from pre-existing ones.
-      Add a session baseline (snapshot at start, report only new findings); fold into Phase 3 "mark reviewed".
+- [x] Gap found: the audit reported every uncommitted change, so an agent could not tell its own changes from pre-existing ones.
+      Fixed with a session baseline: `diffaudit --save-baseline` / `--baseline` (stored in `.git/`, matched by rule+file+content, not line),
+      and Claude Code SessionStart + Stop hooks. Unit tested, and confirmed in a live Claude Code session: old findings did not block, a newly added `it.skip` did (only that one reported).
+- [ ] Baseline in the VS Code UI (command "Set baseline", tree/status bar show only new findings) and in the `diffAuditor_auditChanges` tool.
 - [ ] Fix what breaks; add tests for anything fixable in `src/core`.
 
 ## Phase 2: Rule quality

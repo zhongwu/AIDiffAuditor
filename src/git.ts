@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -82,4 +82,14 @@ export async function collectDiff(req: DiffRequest): Promise<CollectedDiff> {
   }
 
   return { root, diff };
+}
+
+/**
+ * Where the session baseline lives: inside the git directory, so it is never committed and
+ * each worktree gets its own.
+ */
+export async function baselinePath(cwd: string): Promise<string> {
+  const root = (await git(['rev-parse', '--show-toplevel'], cwd)).trim();
+  const p = (await git(['rev-parse', '--git-path', 'diffaudit-baseline.json'], root)).trim();
+  return isAbsolute(p) ? p : join(root, p);
 }
