@@ -53,12 +53,37 @@ export interface CollectedDiff {
   diff: string;
 }
 
+/**
+ * Turns the ref the user asked for into the commit to diff against. Comparing against a branch
+ * means "what did I change since I branched off", so we use the merge base: diffing against the
+ * branch tip would show everything the branch gained since then as if I had deleted it.
+ */
+async function resolveBase(root: string, ref: string): Promise<string> {
+  try {
+    await git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], root);
+  } catch {
+    throw new Error(`Unknown ref "${ref}". Use a branch, tag or commit that exists (see "git branch -a").`);
+  }
+  if (ref === 'HEAD') {
+    return ref;
+  }
+  try {
+    return (await git(['merge-base', ref, 'HEAD'], root)).trim() || ref;
+  } catch {
+    return ref; // unrelated histories: fall back to a plain comparison with the ref
+  }
+}
+
 export async function collectDiff(req: DiffRequest): Promise<CollectedDiff> {
   const root = (await git(['rev-parse', '--show-toplevel'], req.cwd)).trim();
   let base = req.baseRef?.trim() || 'HEAD';
   if (base === 'HEAD' && !(await hasCommits(root))) {
     // A fresh repository has no HEAD yet; compare against the empty tree so staged files still show up.
     base = EMPTY_TREE;
+  }
+
+  if (base !== EMPTY_TREE) {
+    base = await resolveBase(root, base);
   }
 
   let diff = await git(['diff', ...DIFF_FLAGS, base, '--'], root);
@@ -97,4 +122,18 @@ export async function baselinePath(cwd: string): Promise<string> {
 /** Absolute path of the repository that contains `cwd`. */
 export async function repoRoot(cwd: string): Promise<string> {
   return (await git(['rev-parse', '--show-toplevel'], cwd)).trim();
+}
+
+/** Branches, remote branches and tags to offer in a picker, most recently updated first. */
+export async function listRefs(cwd: string): Promise<string[]> {
+  const out = await git(
+    ['for-each-ref', '--sort=-committerdate', '--format=%(refname)', 'refs/heads', 'refs/remotes', 'refs/tags'],
+    cwd,
+  );
+  return out
+    .split('\n')
+    .map((r) => r.trim())
+    .filter((r) => r && !r.endsWith('/HEAD'))
+    .map((r) => r.replace(/^refs\/(?:heads|remotes|tags)\//, ''))
+    .slice(0, 100);
 }

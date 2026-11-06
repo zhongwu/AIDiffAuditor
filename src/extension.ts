@@ -8,7 +8,7 @@ import { countBySeverity, formatFindings } from './core/format';
 import { SEVERITY_RANK } from './core/types';
 import type { Finding, Severity } from './core/types';
 import { loadConfig } from './config';
-import { baselinePath, collectDiff, repoRoot } from './git';
+import { baselinePath, collectDiff, listRefs, repoRoot } from './git';
 
 interface LocatedFinding extends Finding {
   uri: vscode.Uri;
@@ -141,7 +141,7 @@ export function activate(context: vscode.ExtensionContext): void {
     };
   }
 
-  function publish(root: string, findings: Finding[], hidden = 0): void {
+  function publish(root: string, findings: Finding[], hidden = 0, comparedWith?: string): void {
     const located = findings.map((f) => ({ ...f, uri: vscode.Uri.file(join(root, f.file)) }));
 
     diagnostics.clear();
@@ -167,7 +167,8 @@ export function activate(context: vscode.ExtensionContext): void {
     provider.set(located);
     const counts = countBySeverity(findings);
     treeView.message = findings.length === 0 ? 'No suspicious changes found.' : undefined;
-    treeView.description = hidden > 0 ? `${hidden} hidden by baseline` : undefined;
+    treeView.description =
+      [comparedWith ? `vs ${comparedWith}` : '', hidden > 0 ? `${hidden} hidden by baseline` : ''].filter(Boolean).join(', ') || undefined;
     treeView.badge = findings.length ? { value: findings.length, tooltip: `${counts.high} high severity` } : undefined;
     status.text = findings.length === 0 ? '$(shield) Diff Audit: clean' : `$(shield) Diff Audit: ${findings.length} (${counts.high} high)`;
     status.tooltip = hidden > 0 ? `Audit uncommitted changes for agent shortcuts (${hidden} existing finding(s) hidden by the baseline)` : 'Audit uncommitted changes for agent shortcuts';
@@ -204,6 +205,28 @@ export function activate(context: vscode.ExtensionContext): void {
         auditAndShow(true),
       ),
     ),
+    vscode.commands.registerCommand('diffAuditor.auditAgainstRef', async () => {
+      try {
+        const refs = await listRefs(pickFolder().uri.fsPath);
+        const typed = '$(edit) Type a commit or ref...';
+        const pick = await vscode.window.showQuickPick([typed, ...refs], {
+          placeHolder: 'Compare your changes with which branch, tag or commit?',
+        });
+        const ref = pick === typed ? await vscode.window.showInputBox({ prompt: 'Branch, tag or commit' }) : pick;
+        if (!ref) {
+          return;
+        }
+        const { root, findings, hidden } = await runAudit(ref);
+        publish(root, findings, hidden, ref);
+        if (findings.length > 0) {
+          await vscode.commands.executeCommand('diffAuditor.findings.focus');
+        } else {
+          void vscode.window.showInformationMessage(`Diff Auditor: no suspicious changes since ${ref}.`);
+        }
+      } catch (err) {
+        void vscode.window.showErrorMessage(`Diff Auditor: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }),
     vscode.commands.registerCommand('diffAuditor.setBaseline', async () => {
       try {
         const cwd = pickFolder().uri.fsPath;

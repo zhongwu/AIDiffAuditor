@@ -51,6 +51,8 @@ node out/src/cli.js --fail-on high
 Options: `--base <ref>`, `--stdin`, `--no-untracked`, `--ignore <rule-id>`, `--json`, `--fail-on high|medium|low|never`.
 Exit code is 1 when a finding reaches `--fail-on`, so it can gate a commit, an agent hook or a CI job.
 
+**Comparing with a branch.** `diffaudit --base origin/main` (or the **Diff Auditor: Audit Against Branch or Commit...** command, or `baseRef` in `.diffauditor.json`) reports what you changed since you branched off, even if the branch has moved on since. It diffs against the merge base, not the branch tip, so a test a teammate added to `main` after you branched is not reported as deleted. An unknown ref is an error that says so.
+
 ## Settings
 
 `diffAuditor.baseRef` (default `HEAD`), `diffAuditor.includeUntracked`, `diffAuditor.minSeverity`,

@@ -12,7 +12,7 @@ const USAGE = `diffaudit - scan a git diff for shortcuts AI agents take to look 
 
 Usage: diffaudit [options]
 
-  --base <ref>        Compare the working tree against <ref> (default: HEAD)
+  --base <ref>        Compare against <ref> (default: HEAD). For a branch, uses the point you branched off
   --stdin             Read a unified diff from stdin instead of running git
   --no-untracked      Ignore files git does not track yet
   --ignore <rule-id>  Turn a rule off (repeatable)

@@ -59,6 +59,15 @@ export async function run(): Promise<void> {
     assert.match(text, /a\.test\.js/);
   });
 
+  await check('the agent tool compares against a ref, and an unknown ref is a readable error', async () => {
+    const call = async (baseRef: string): Promise<string> => {
+      const r = await vscode.lm.invokeTool('diffAuditor_auditChanges', { input: { baseRef }, toolInvocationToken: undefined });
+      return r.content.map((p) => (p instanceof vscode.LanguageModelTextPart ? p.value : '')).join('');
+    };
+    assert.match(await call('HEAD'), /a.test.js/);
+    assert.match(await call('no-such-ref'), /Unknown ref "no-such-ref"/);
+  });
+
   await check('.diffauditor.json: ignorePaths and ignoreRules apply, and a bad file is reported', async () => {
     const file = join(process.env.DIFFAUDIT_REPO as string, '.diffauditor.json');
     try {

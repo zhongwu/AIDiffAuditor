@@ -88,3 +88,53 @@ test('binary files and an unknown base ref do not crash', async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- comparing against a branch ----------------------------------------------
+
+function branchedRepo(): string {
+  const dir = scratch();
+  writeFileSync(join(dir, 'README.md'), '# x\n');
+  sh(dir, 'add', '.');
+  sh(dir, 'commit', '-q', '-m', 'init');
+  sh(dir, 'branch', '-M', 'main');
+  sh(dir, 'checkout', '-q', '-b', 'feature');
+  // main moves on after the branch point: a teammate adds a test file.
+  sh(dir, 'checkout', '-q', 'main');
+  writeFileSync(join(dir, 'team.test.js'), TEST_FILE);
+  sh(dir, 'add', '.');
+  sh(dir, 'commit', '-q', '-m', 'teammate adds a test');
+  sh(dir, 'checkout', '-q', 'feature');
+  return dir;
+}
+
+test('comparing against a branch ignores what that branch gained after you branched off', async () => {
+  const dir = branchedRepo();
+  writeFileSync(join(dir, 'mine.js'), 'export const a = 1;\n');
+  const { diff } = await collectDiff({ cwd: dir, baseRef: 'main' });
+  assert.deepEqual(auditDiff(diff).map((f) => `${f.ruleId} ${f.file}`), [], 'the teammate test file must not look deleted');
+  assert.match(diff, /mine\.js/);
+  assert.doesNotMatch(diff, /team\.test\.js/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('comparing against a branch still finds shortcuts made on this branch', async () => {
+  const dir = branchedRepo();
+  writeFileSync(join(dir, 'mine.test.js'), "it.skip('adds', () => {\n  expect(add(1, 2)).toBe(3);\n});\n");
+  const { diff } = await collectDiff({ cwd: dir, baseRef: 'main' });
+  assert.deepEqual(auditDiff(diff).map((f) => f.ruleId), ['test-skipped']);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('an unknown ref gives a clear error', async () => {
+  const dir = branchedRepo();
+  await assert.rejects(collectDiff({ cwd: dir, baseRef: 'no-such-branch' }), /Unknown ref "no-such-branch"/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('a commit that is an ancestor still works as a base', async () => {
+  const dir = branchedRepo();
+  writeFileSync(join(dir, 'mine.js'), 'export const a = 1;\n');
+  const { diff } = await collectDiff({ cwd: dir, baseRef: 'HEAD' });
+  assert.match(diff, /mine\.js/);
+  rmSync(dir, { recursive: true, force: true });
+});

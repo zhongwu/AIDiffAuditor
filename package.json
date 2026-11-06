@@ -52,6 +52,10 @@
         "command": "diffAuditor.markReviewed",
         "title": "Diff Auditor: Mark Finding as Reviewed",
         "icon": "$(check)"
+      },
+      {
+        "command": "diffAuditor.auditAgainstRef",
+        "title": "Diff Auditor: Audit Against Branch or Commit..."
       }
     ],
     "views": {
@@ -79,6 +83,11 @@
           "command": "diffAuditor.clearBaseline",
           "when": "view == diffAuditor.findings",
           "group": "baseline@2"
+        },
+        {
+          "command": "diffAuditor.auditAgainstRef",
+          "when": "view == diffAuditor.findings",
+          "group": "baseline@0"
         }
       ],
       "view/item/context": [
