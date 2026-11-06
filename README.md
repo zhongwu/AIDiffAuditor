@@ -48,10 +48,38 @@ npm run compile
 node out/src/cli.js --fail-on high
 ```
 
-Options: `--base <ref>`, `--stdin`, `--no-untracked`, `--ignore <rule-id>`, `--json`, `--fail-on high|medium|low|never`.
+Options: `--base <ref>`, `--stdin`, `--no-untracked`, `--ignore <rule-id>`, `--json`, `--sarif`, `--output <file>`, `--min-severity`, `--fail-on high|medium|low|never`.
 Exit code is 1 when a finding reaches `--fail-on`, so it can gate a commit, an agent hook or a CI job.
 
 **Comparing with a branch.** `diffaudit --base origin/main` (or the **Diff Auditor: Audit Against Branch or Commit...** command, or `baseRef` in `.diffauditor.json`) reports what you changed since you branched off, even if the branch has moved on since. It diffs against the merge base, not the branch tip, so a test a teammate added to `main` after you branched is not reported as deleted. An unknown ref is an error that says so.
+
+**In CI with GitHub code scanning.** `--sarif` writes a SARIF 2.1.0 report that GitHub shows as annotations on the pull request. `--output <file>` writes it to a file, so the exit code can still gate the job:
+
+```yaml
+name: Diff audit
+on: pull_request
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Build the auditor
+        run: |
+          git clone --depth 1 https://github.com/zhongwu/AIDiffAuditor.git "$RUNNER_TEMP/diffaudit"
+          (cd "$RUNNER_TEMP/diffaudit" && npm ci && npm run compile)
+      - name: Audit the pull request
+        run: node "$RUNNER_TEMP/diffaudit/out/src/cli.js" --base "origin/${{ github.base_ref }}" --sarif --output diffaudit.sarif --fail-on never
+      - uses: github/codeql-action/upload-sarif@v3
+        with: { sarif_file: diffaudit.sarif }
+```
+
+Use `--fail-on high` instead of `never` to fail the job on high-severity findings (upload the report in an `if: always()` step so it still appears). Severity maps to the SARIF level: high is `error`, medium `warning`, low `note`. Each result carries a fingerprint based on rule, file and code (not the line number), so GitHub recognises the same finding after it moves. Code scanning on private repositories needs GitHub Advanced Security. The workflow above has not been run on GitHub yet; the report itself is checked against the official SARIF schema.
 
 ## Settings
 

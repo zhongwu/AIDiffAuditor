@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Agent Diff Auditor",
+          "version": "0.0.1",
+          "informationUri": "https://github.com/zhongwu/AIDiffAuditor",
+          "rules": [
+            {
+              "id": "test-file-deleted",
+              "name": "test-file-deleted",
+              "shortDescription": {
+                "text": "A test file was deleted."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "test-skipped",
+              "name": "test-skipped",
+              "shortDescription": {
+                "text": "A test was switched off with skip / xit / @Disabled / t.Skip and similar."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "test-focused",
+              "name": "test-focused",
+              "shortDescription": {
+                "text": "A test was focused with .only / fit, so the rest of the suite stops running."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "test-removed",
+              "name": "test-removed",
+              "shortDescription": {
+                "text": "More test cases were removed from a file than were added."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "assertion-removed",
+              "name": "assertion-removed",
+              "shortDescription": {
+                "text": "More assertions were removed from a test file than were added."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "assertion-weakened",
+              "name": "assertion-weakened",
+              "shortDescription": {
+                "text": "A precise assertion was replaced by one that accepts almost any value."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "tautology-assertion",
+              "name": "tautology-assertion",
+              "shortDescription": {
+                "text": "An assertion that can never fail, such as expect(true).toBe(true)."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "suppression-added",
+              "name": "suppression-added",
+              "shortDescription": {
+                "text": "A type, lint or coverage suppression comment was added."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "empty-catch",
+              "name": "empty-catch",
+              "shortDescription": {
+                "text": "An error is caught and silently ignored."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "ci-weakened",
+              "name": "ci-weakened",
+              "shortDescription": {
+                "text": "A CI or build step was changed so that failures no longer fail the build."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "ci-test-removed",
+              "name": "ci-test-removed",
+              "shortDescription": {
+                "text": "A test command was removed from a CI pipeline."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "coverage-lowered",
+              "name": "coverage-lowered",
+              "shortDescription": {
+                "text": "A coverage threshold was lowered, so the build passes with less of the code tested."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "timeout-inflated",
+              "name": "timeout-inflated",
+              "shortDescription": {
+                "text": "A test timeout was raised a lot, which can hide a test that became slow or hangs."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "retries-added",
+              "name": "retries-added",
+              "shortDescription": {
+                "text": "Test retries were added, so a flaky test is rerun instead of fixed."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            }
+          ]
+        }
+      },
+      "originalUriBaseIds": {
+        "%SRCROOT%": {
+          "description": {
+            "text": "The repository root."
+          }
+        }
+      },
+      "results": [
+        {
+          "ruleId": "test-skipped",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": {
+            "text": "Test skipped or disabled"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "math.test.js",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 2,
+                  "snippet": {
+                    "text": "it.skip('adds', () => {"
+                  }
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "diffAuditFinding/v1": "2ea930c8768d7a849b164bd4abed03c1:1"
+          }
+        },
+        {
+          "ruleId": "test-skipped",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": {
+            "text": "Test skipped or disabled"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "new.test.js",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 2,
+                  "snippet": {
+                    "text": "xit('adds', () => {"
+                  }
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "diffAuditFinding/v1": "473b48c4cf11b748694a9432b2e1f9f8:1"
+          }
+        },
+        {
+          "ruleId": "ci-test-removed",
+          "ruleIndex": 10,
+          "level": "warning",
+          "message": {
+            "text": "A test command was removed from the CI pipeline"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/ci.yml",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 2,
+                  "snippet": {
+                    "text": "- run: npm test"
+                  }
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "diffAuditFinding/v1": "1ff42ac37dc3cb6383f4b52ca505f6af:1"
+          }
+        },
+        {
+          "ruleId": "suppression-added",
+          "ruleIndex": 7,
+          "level": "warning",
+          "message": {
+            "text": "Suppression added: type error suppressed with @ts-ignore"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app.ts",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 1,
+                  "snippet": {
+                    "text": "// @ts-ignore"
+                  }
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "diffAuditFinding/v1": "d4686b94a818ce4848d4ffdfec8c8b2f:1"
+          }
+        },
+        {
+          "ruleId": "empty-catch",
+          "ruleIndex": 8,
+          "level": "warning",
+          "message": {
+            "text": "Error swallowed by an empty catch / except block"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app.ts",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 5,
+                  "snippet": {
+                    "text": "try { add(1, 2); } catch (e) {}"
+                  }
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "diffAuditFinding/v1": "8bef3b5210f07db28fe79b44db745c8f:1"
+          }
+        }
+      ]
+    }
+  ]
+}

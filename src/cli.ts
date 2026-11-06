@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { auditDiff } from './core/audit';
 import { createBaseline, newSinceBaseline, parseBaseline } from './core/baseline';
 import { formatFindings } from './core/format';
+import { toSarif } from './core/sarif';
 import { SEVERITY_RANK } from './core/types';
 import type { Severity } from './core/types';
 import { loadConfig } from './config';
@@ -21,6 +23,8 @@ Usage: diffaudit [options]
   --save-baseline     Record the current findings as the baseline (stored inside .git) and exit
   --baseline          Report only findings that are not in the saved baseline
   --json              Print findings as JSON
+  --sarif             Print findings as SARIF 2.1.0 (GitHub code scanning and other CI viewers)
+  --output <file>     Write the report to <file> instead of printing it
   -h, --help          Show this help
 
 Team defaults (ignoreRules, minSeverity, ignorePaths, baseRef) are read from .diffauditor.json
@@ -28,11 +32,23 @@ at the repository root; flags override them.
 
 Exit codes: 0 = ok, 1 = findings at or above --fail-on, 2 = could not run.`;
 
+const REPO_URL = 'https://github.com/zhongwu/AIDiffAuditor';
+
+function toolVersion(): string | undefined {
+  try {
+    return JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8')).version;
+  } catch {
+    return undefined;
+  }
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   let base: string | undefined;
   let stdin = false;
   let json = false;
+  let sarif = false;
+  let output: string | undefined;
   let untracked = true;
   let saveBaseline = false;
   let useBaseline = false;
@@ -53,6 +69,8 @@ async function main(): Promise<void> {
       case '--base': base = value(); break;
       case '--stdin': stdin = true; break;
       case '--json': json = true; break;
+      case '--sarif': sarif = true; break;
+      case '--output': output = value(); break;
       case '--save-baseline': saveBaseline = true; break;
       case '--baseline': useBaseline = true; break;
       case '--no-untracked': untracked = false; break;
@@ -82,6 +100,9 @@ async function main(): Promise<void> {
     }
   }
 
+  if (json && sarif) {
+    throw new Error('--json and --sarif cannot be used together');
+  }
   if (stdin && (saveBaseline || useBaseline)) {
     throw new Error('--save-baseline and --baseline need a git repository, so they cannot be used with --stdin');
   }
@@ -115,7 +136,17 @@ async function main(): Promise<void> {
     hidden = total - findings.length;
   }
 
-  console.log(json ? JSON.stringify(findings, null, 2) : formatFindings(findings, Infinity, hidden));
+  const report = sarif
+    ? JSON.stringify(toSarif(findings, { version: toolVersion(), informationUri: REPO_URL }), null, 2)
+    : json
+      ? JSON.stringify(findings, null, 2)
+      : formatFindings(findings, Infinity, hidden);
+  if (output) {
+    writeFileSync(output, `${report}\n`);
+    console.error(`Diff Auditor: ${findings.length} finding(s) written to ${output}`);
+  } else {
+    console.log(report);
+  }
   if (failOn !== 'never' && findings.some((f) => SEVERITY_RANK[f.severity] >= SEVERITY_RANK[failOn])) {
     process.exitCode = 1;
   }

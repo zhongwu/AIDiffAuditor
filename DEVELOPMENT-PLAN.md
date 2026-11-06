@@ -50,7 +50,7 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [x] "Mark reviewed" for individual findings: check button in the view, a "mark as reviewed" quick fix, and a palette command. It adds the finding to the shared baseline file (`addToBaseline`), so the CLI and hooks honour it too. Integration test covers the quick fix. Note: *Set Baseline* overwrites earlier marks, but it re-captures every current finding anyway.
 - [x] Shared team config file `.diffauditor.json` (`ignoreRules`, `minSeverity`, `ignorePaths`, `baseRef`), read by the extension, the CLI and the agent hooks; JSON schema for editor validation; unknown keys and bad values are clear errors; precedence is CLI flag or explicit VS Code setting over the file. 106 unit tests plus an integration check.
 - [x] Compare against a chosen ref: `--base`, the `baseRef` setting or config key, a picker command in the editor, and the agent tool's `baseRef` input. Diffs against the merge base so a branch that moved on does not make its new tests look deleted (found and fixed while writing the tests). Unknown refs give a clear error. Picker UI itself is not automated.
-- [ ] CLI polish: JSON and SARIF output, docs for pre-commit hook and CI use.
+- [~] CLI output: `--sarif` (SARIF 2.1.0, validated against the official schema on the sandbox, all fixtures, an empty run and an odd file name), `--output <file>`, stable fingerprints, README snippet for GitHub code scanning. The GitHub Actions workflow in the README has not been run on GitHub yet. Still to do: a pre-commit hook recipe.
 
 ## Phase 4: Pre-release
 - [ ] Re-check Marketplace and Open VSX for competitors (Critical Gate, BotsIQ Change Verifier, checkwash, tightdiff).
