@@ -6,3 +6,4 @@ CLAUDE.md
 SESSION-NOTES.md
 .sandbox/
 .vscode-test/
+*.sarif
