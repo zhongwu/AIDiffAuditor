@@ -53,11 +53,23 @@ differentiators: editor UI for the rules, non-JS test framework coverage, agent-
 - [~] CLI output: `--sarif` (SARIF 2.1.0, validated against the official schema on the sandbox, all fixtures, an empty run and an odd file name), `--output <file>`, stable fingerprints, README snippet for GitHub code scanning. The GitHub Actions workflow in the README has not been run on GitHub yet. Still to do: a pre-commit hook recipe.
 
 ## Phase 4: Pre-release
-- [ ] Re-check Marketplace and Open VSX for competitors (Critical Gate, BotsIQ Change Verifier, checkwash, tightdiff).
-- [ ] Create a publisher, replace the placeholder `publisher` in package.json.
-- [ ] Icon, README screenshots/GIF, CHANGELOG, categories and keywords.
-- [ ] `vsce package`, install the .vsix in a clean profile, smoke test.
-- [ ] Publish 0.1.0 as pre-release to both registries.
+- [~] Re-check competitors (2026-11-05, web search summaries only; the pages themselves were not opened, so confirm on the Marketplace before relying on this). The field has grown since the first check:
+      VS Code extensions: Critical Gate (`criticaldeveloper.critical-gate-vscode`, task-scope checks), AgentCheck (`agentcheck.agentcheck-vscode`, checkpoint and compare), Change Integrity (`metratio.change-integrity`), CC Diff Review (hunk accept/reject), agentdiff (tracing).
+      CLIs doing test-tampering detection: checkwash (PyPI, also has a Claude Code hook), tamperguard (PyPI), tampercheck (PyPI), proof-of-work-agent (PyPI), hallucot (npm), Swarm Orchestrator.
+      "BotsIQ Change Verifier" and "tightdiff" from the first check were not found. The search found no editor extension that shows weakened-assertion findings inline, but that is unconfirmed.
+      Note: the dev.to article "Catching the shortcuts AI coding agents take to look done" uses almost our tagline; consider rewording the description.
+- [x] Publisher: `zhongwu` (same as MdEditorExt; the Open VSX namespace `zhongwu` is already claimed and verified). `package.json` and the integration test now use `zhongwu.agent-diff-auditor`; `private` removed. Workflows added, copied from MdEditorExt: `ci.yml` (unit and integration tests on Linux, Windows and macOS), `publish.yml` (a `v*` tag runs tests, packages once, publishes to both registries with trusted publishing, no stored tokens; an odd minor version such as 0.1.x is a pre-release), `dependabot.yml`. Not yet run on GitHub, so the cross-platform results are unknown.
+- [x] Icon (generated placeholder, `node scripts/make-icon.js`), CHANGELOG, categories, keywords, `repository`/`bugs`/`homepage`, version 0.1.0.
+- [ ] README screenshots or a short GIF (needs you to capture them from the running extension).
+- [x] `vsce package --pre-release`: 21 files, 41 KB, no warnings. Installed into a clean VS Code profile. The integration suite (10 checks) passes against the unpacked .vsix alone: `DIFFAUDIT_EXTENSION_PATH=<unpacked dir> node out/integration/runTest.js`.
+- [ ] Not yet tested: Open VSX, other VS Code forks (Cursor, VSCodium), a Linux or macOS machine.
+- [ ] First release of 0.1.0, in this order (the first version of a new extension cannot use trusted publishing, which MdEditorExt's notes also found). Only you can do these:
+  1. Commit and push this work (workflows included) to `main`, so GitHub has `publish.yml`.
+  2. `npm run package`, then upload `agent-diff-auditor-0.1.0.vsix` by hand at https://marketplace.visualstudio.com/manage (publisher `zhongwu` > New extension > Visual Studio Code). It shows "Verifying" for a few minutes, and the listing can lag up to an hour.
+  3. On the publisher page, add a Trusted Publishing policy ("Release on tag") for repository `zhongwu/AIDiffAuditor`, workflow `publish.yml`. Make it again if the repository is renamed or recreated.
+  4. Open VSX first release needs a token (create one at open-vsx.org > Settings > Access Tokens, namespace `zhongwu`, "Publishing only"). In your own PowerShell, never in chat or a file: `$env:OVSX_PAT = Read-Host "Open VSX token"`, then `npx ovsx publish agent-diff-auditor-0.1.0.vsix -p $env:OVSX_PAT`. Delete the token and the .vsix afterwards. The listing can take a few minutes to appear at https://open-vsx.org/extension/zhongwu/agent-diff-auditor.
+  5. At open-vsx.org > Settings > Trusted Publishers > Register: namespace `zhongwu`, GitHub, extension `agent-diff-auditor`, owner `zhongwu`, repository `AIDiffAuditor`, workflow `publish.yml`, no environment.
+  6. Releases after that: raise `version` in `package.json` and `package-lock.json` (`npm version X.Y.Z --no-git-tag-version`), add a CHANGELOG entry, commit and push to `main`, then `git tag vX.Y.Z` and `git push origin vX.Y.Z`. The README on the listing only changes with a new version.
 
 ## Phase 5: After launch
 - [ ] MCP server wrapper around `src/core`.

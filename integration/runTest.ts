@@ -29,7 +29,8 @@ async function main(): Promise<void> {
   await runTests({
     // Use the installed VS Code when given, otherwise download a stable build.
     vscodeExecutablePath: process.env.VSCODE_EXECUTABLE_PATH,
-    extensionDevelopmentPath: root,
+    // Point DIFFAUDIT_EXTENSION_PATH at an unpacked .vsix to test the packaged files instead of the sources.
+    extensionDevelopmentPath: process.env.DIFFAUDIT_EXTENSION_PATH ?? root,
     extensionTestsPath: join(root, 'out', 'integration', 'suite.js'),
     launchArgs: [repo, '--disable-extensions', '--user-data-dir', mkdtempSync(join(tmpdir(), 'diffaudit-ud-'))],
     extensionTestsEnv: { DIFFAUDIT_REPO: repo },

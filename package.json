@@ -2,10 +2,22 @@
   "name": "agent-diff-auditor",
   "displayName": "Agent Diff Auditor",
   "description": "Catches the shortcuts AI coding agents take to look done: skipped or deleted tests, weakened assertions, suppressed errors and softened CI.",
-  "version": "0.0.1",
-  "publisher": "your-publisher-id",
+  "version": "0.1.0",
+  "publisher": "zhongwu",
   "license": "MIT",
-  "private": true,
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhongwu/AIDiffAuditor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zhongwu/AIDiffAuditor/issues"
+  },
+  "homepage": "https://github.com/zhongwu/AIDiffAuditor#readme",
+  "galleryBanner": {
+    "color": "#0f172a",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.100.0",
     "node": ">=22"
@@ -173,6 +185,7 @@
   },
   "scripts": {
     "compile": "tsc -p .",
+    "package": "npx --yes @vscode/vsce package --no-dependencies --pre-release",
     "watch": "tsc -watch -p .",
     "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
     "vscode:prepublish": "npm run compile",

@@ -1,0 +1,43 @@
+name: Publish
+
+# Runs when a version tag such as v0.1.1 is pushed. See "Releasing" in DEVELOPMENT-PLAN.md.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # id-token lets the job prove which repository and workflow it is, to the Marketplace
+    # (a trusted publishing policy on the publisher page) and to Open VSX (a trusted
+    # publisher registered for the extension), so no access token is stored here.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check the tag matches package.json
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm test
+      # An odd minor version (0.1.x, 0.3.x) is a pre-release, an even one (0.2.x) a normal release.
+      - name: Decide whether this is a pre-release
+        run: |
+          minor=$(node -p "require('./package.json').version.split('.')[1]")
+          if [ $((minor % 2)) -eq 1 ]; then echo "PRERELEASE=--pre-release" >> "$GITHUB_ENV"; fi
+      # One package, so both registries get exactly the same file.
+      - name: Package the extension
+        run: npx @vscode/vsce package --no-dependencies $PRERELEASE --out extension.vsix
+      - name: Publish to the Visual Studio Marketplace
+        run: npx @vscode/vsce publish --oidc --packagePath extension.vsix
+      - name: Publish to Open VSX
+        run: npx ovsx publish extension.vsix --trusted-publishing

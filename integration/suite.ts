@@ -3,7 +3,7 @@ import { appendFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
 
-const EXT_ID = 'your-publisher-id.agent-diff-auditor';
+const EXT_ID = 'zhongwu.agent-diff-auditor';
 
 function diagnosticsFor(suffix: string): vscode.Diagnostic[] {
   return vscode.languages
