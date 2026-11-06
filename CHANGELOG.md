@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 (pre-release)
+
+- README now has a demo GIF and a screenshot recorded from the real extension. No behaviour change from 0.1.1.
+
 ## 0.1.1 (pre-release)
 
 - New description and README introduction.

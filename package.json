@@ -2,7 +2,7 @@
   "name": "agent-diff-auditor",
   "displayName": "Agent Diff Auditor",
   "description": "Review what your AI agent actually changed: flags skipped or deleted tests, weakened assertions, suppressed errors and softened CI in your git diff.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "zhongwu",
   "license": "MIT",
   "icon": "images/icon.png",
