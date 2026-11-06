@@ -16,3 +16,5 @@ out/integration/**
 scripts/**
 .sandbox/**
 .vscode-test/**
+images/demo.gif
+images/findings.png

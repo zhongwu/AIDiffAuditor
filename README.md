@@ -5,6 +5,12 @@ suppressed errors and softened CI in your `git diff`, so a "done" that is not re
 It works with any agent (Copilot, Claude Code, Cursor, Codex...) and needs no API key. Every rule is
 plain pattern matching, so it is free and fast.
 
+![Running Diff Auditor in VS Code: five findings appear in the view, the editor and the Problems panel, then one is marked as reviewed](images/demo.gif)
+
+The recording is a sample repository where an agent skipped a test, weakened an assertion, added a `@ts-ignore`,
+swallowed an error and softened CI. Diff Auditor lists each one with the file and line, and you can mark the ones you
+accept as reviewed.
+
 ## What it flags
 
 | Rule id | Severity | Catches |
@@ -32,6 +38,7 @@ Untracked files are audited too, because agents often add new test files.
 the *Diff Auditor* view in the Explorer, in the Problems panel and in the status bar. Click one to
 jump to the line.
 
+![The Diff Auditor view, squiggles in the editor, the Problems panel and the status bar summary](images/findings.png)
 
 **Hiding findings you have accepted.** *Set Baseline (Hide Current Findings)* hides everything that exists now, so only
 what an agent adds later is reported. To accept a single finding, click the check mark next to it in the view, or use the
