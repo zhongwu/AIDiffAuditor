@@ -5,6 +5,15 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    ignore:
+      # Must not run ahead of engines.vscode, or vsce refuses to package.
+      - dependency-name: "@types/vscode"
+      # Keep in step with the Node version CI and the publish workflow use.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # TypeScript 7 does not compile this project yet.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 (pre-release)
+
+- New description and README introduction.
+- README: pre-commit hook recipe; removed outdated "not done yet" items.
+- First release published from GitHub Actions with trusted publishing (no access token).
+
 ## 0.1.0 (pre-release)
 
 First public pre-release.

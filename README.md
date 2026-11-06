@@ -1,9 +1,9 @@
 # Agent Diff Auditor
 
-Catches the shortcuts AI coding agents take to make a task *look* finished: tests that were
-skipped or deleted, assertions that were weakened, errors that were suppressed, CI that was
-softened. It reads your uncommitted `git diff`, so it works with any agent (Copilot, Claude Code,
-Cursor, Codex...) and needs no API key. Every rule is plain pattern matching, so it is free and fast.
+Review what your AI agent actually changed. It flags skipped or deleted tests, weakened assertions,
+suppressed errors and softened CI in your `git diff`, so a "done" that is not really done stands out.
+It works with any agent (Copilot, Claude Code, Cursor, Codex...) and needs no API key. Every rule is
+plain pattern matching, so it is free and fast.
 
 ## What it flags
 
@@ -28,7 +28,7 @@ Untracked files are audited too, because agents often add new test files.
 
 ## Use it
 
-**In VS Code** (press F5 to launch a dev host): run **Diff Auditor: Audit Changes**. Findings show in
+**In VS Code:** run **Diff Auditor: Audit Changes**. Findings show in
 the *Diff Auditor* view in the Explorer, in the Problems panel and in the status bar. Click one to
 jump to the line.
 
@@ -50,6 +50,16 @@ node out/src/cli.js --fail-on high
 
 Options: `--base <ref>`, `--stdin`, `--no-untracked`, `--ignore <rule-id>`, `--json`, `--sarif`, `--output <file>`, `--min-severity`, `--fail-on high|medium|low|never`.
 Exit code is 1 when a finding reaches `--fail-on`, so it can gate a commit, an agent hook or a CI job.
+
+**As a pre-commit hook.** Put this in `.git/hooks/pre-commit` (and make it executable) to stop a commit that contains a high-severity finding. A hook sees the working tree, so it checks what you are about to commit plus anything unstaged; use `--base` or the baseline if that is too broad:
+
+```sh
+#!/bin/sh
+node /path/to/AIDiffAuditor/out/src/cli.js --fail-on high || {
+  echo "Diff Auditor found high-severity shortcuts. Review them, or commit with --no-verify." >&2
+  exit 1
+}
+```
 
 **Comparing with a branch.** `diffaudit --base origin/main` (or the **Diff Auditor: Audit Against Branch or Commit...** command, or `baseRef` in `.diffauditor.json`) reports what you changed since you branched off, even if the branch has moved on since. It diffs against the merge base, not the branch tip, so a test a teammate added to `main` after you branched is not reported as deleted. An unknown ref is an error that says so.
 
@@ -122,8 +132,8 @@ npm test        # compiles, then runs the node:test suite
 
 ## Not done yet
 
-- Python/Go/Java/Rust coverage is thinner than JS/TS. `test.each` tables are not inspected.
-- No config file for team-wide rules, and no per-line "mark reviewed".
+- It matches patterns in the diff; it cannot tell whether a test is meaningful.
+- Tests deleted because the code moved to another repository are still reported. Mark them as reviewed.
 - Heuristics can misfire, for example a legitimate `// @ts-expect-error` in a type test. Use
-  `diffAuditor.ignoreRules` to switch a rule off.
-- Not yet published. `package.json` has a placeholder publisher id; publish with `vsce` and `ovsx`.
+  `diffAuditor.ignoreRules` or `.diffauditor.json` to switch a rule off.
+- Measured on human history and hand-written agent-style diffs, not yet on many real agent sessions.
